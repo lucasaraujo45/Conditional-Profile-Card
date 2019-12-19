@@ -98,7 +98,7 @@ exports = module.exports = __webpack_require__(/*! ../../node_modules/css-loader
 exports.push([module.i, "@import url(https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css);", ""]);
 
 // module
-exports.push([module.i, ".filters {\n  background: white;\n  width: 100%; }\n  .filters li {\n    display: inline-block;\n    max-width: 80px;\n    padding: 3px; }\n    .filters li label {\n      display: block;\n      font-size: 12px;\n      font-weight: 900; }\n    .filters li input {\n      width: 100%; }\n    .filters li select {\n      width: 100%; }\n\n.widget {\n  position: relative;\n  width: 300px;\n  height: 350px;\n  margin: 50px auto;\n  background: #fff;\n  border-radius: 5px;\n  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1); }\n  .widget .cover {\n    height: 160px;\n    overflow: hidden; }\n    .widget .cover img {\n      width: 100%;\n      height: auto;\n      min-height: 160px;\n      border-radius: 4px 4px 0 0; }\n  .widget .photo {\n    position: absolute;\n    top: 85px;\n    left: 50%;\n    width: 100px;\n    height: 100px;\n    margin: 0 0 0 -55px;\n    border: 5px solid #fff;\n    border-radius: 50%; }\n  .widget h1,\n  .widget h2,\n  .widget h3 {\n    display: block;\n    margin: 10px 0;\n    text-align: center;\n    font-family: \"Open Sans\", sans-serif;\n    font-size: 16px;\n    font-weight: 300;\n    color: #999; }\n  .widget h1 {\n    margin: 60px 0 20px;\n    font-size: 26px;\n    color: #000; }\n  .widget h3 {\n    font-size: 12px; }\n  .widget ul {\n    position: absolute;\n    top: 20px;\n    padding: 0;\n    background: #2cdfd3; }\n    .widget ul.position-left {\n      left: -26px; }\n    .widget ul.position-right {\n      right: -27px; }\n    .widget ul li {\n      list-style: none; }\n      .widget ul li a {\n        display: block;\n        padding: 5px 6px;\n        color: #fff;\n        cursor: pointer;\n        text-align: center;\n        border-bottom: 1px solid #2cd5ca;\n        transition: background-color 0.3s; }\n      .widget ul li:hover > a {\n        background-color: #2cd5ca; }\n      .widget ul li:first-child > a {\n        border-radius: 0 3px 0 0; }\n      .widget ul li:last-child > a {\n        border: none;\n        border-radius: 0 0 3px 0; }\n\ninput ~ .focus-border {\n  position: absolute;\n  bottom: 0;\n  left: 50%;\n  width: 0;\n  height: 2px;\n  background-color: #3399FF;\n  transition: 0.4s; }\n\ninput ~ .focus-border {\n  width: 100%;\n  transition: 0.4s;\n  left: 0; }\n", ""]);
+exports.push([module.i, ".filters {\n  background: white;\n  width: 100%; }\n  .filters li {\n    display: inline-block;\n    max-width: 80px;\n    padding: 3px; }\n    .filters li label {\n      display: block;\n      font-size: 12px;\n      font-weight: 900; }\n    .filters li input {\n      width: 100%; }\n    .filters li select {\n      width: 100%; }\n\n.widget {\n  position: relative;\n  width: 300px;\n  height: 350px;\n  margin: 50px auto;\n  background: #fff;\n  border-radius: 5px;\n  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1); }\n  .widget .cover {\n    height: 160px;\n    overflow: hidden; }\n    .widget .cover img {\n      width: 100%;\n      height: auto;\n      min-height: 160px;\n      border-radius: 4px 4px 0 0; }\n  .widget .photo {\n    position: absolute;\n    top: 85px;\n    left: 50%;\n    width: 100px;\n    height: 100px;\n    margin: 0 0 0 -55px;\n    border: 5px solid #fff;\n    border-radius: 50%; }\n  .widget h1,\n  .widget h2,\n  .widget h3 {\n    display: block;\n    margin: 10px 0;\n    text-align: center;\n    font-family: \"Open Sans\", sans-serif;\n    font-size: 16px;\n    font-weight: 300;\n    color: #999; }\n  .widget h1 {\n    margin: 60px 0 20px;\n    font-size: 26px;\n    color: #000; }\n  .widget h3 {\n    font-size: 12px; }\n  .widget ul {\n    position: absolute;\n    top: 20px;\n    padding: 0;\n    background: #2cdfd3; }\n    .widget ul.position-left {\n      left: -26px; }\n    .widget ul.position-right {\n      right: -27px; }\n    .widget ul li {\n      list-style: none; }\n      .widget ul li a {\n        display: block;\n        padding: 5px 6px;\n        color: #fff;\n        cursor: pointer;\n        text-align: center;\n        border-bottom: 1px solid #2cd5ca;\n        transition: background-color 0.3s; }\n      .widget ul li:hover > a {\n        background-color: #2cd5ca; }\n      .widget ul li:first-child > a {\n        border-radius: 0 3px 0 0; }\n      .widget ul li:last-child > a {\n        border: none;\n        border-radius: 0 0 3px 0; }\n", ""]);
 
 // exports
 
@@ -710,14 +710,14 @@ function render(variables = {}) {
   document.querySelector("#widget_content").innerHTML = `<div class="widget">
             ${cover}
           <img src="${variables.avatarURL}" class="photo" />
-          <h1>Lucy Boilett</h1>
-          <h2>Web Developer</h2>
-          <h3>Miami, USA</h3>
-          <ul class="position-right">
-            <li><a href="https://twitter.com/alesanchezr"><i class="fa fa-twitter"></i></a></li>
-            <li><a href="https://github.com/alesanchezr"><i class="fa fa-github"></i></a></li>
-            <li><a href="https://linkedin.com/alesanchezr"><i class="fa fa-linkedin"></i></a></li>
-            <li><a href="https://instagram.com/alesanchezr"><i class="fa fa-instagram"></i></a></li>
+          <h1>${variables.name} ${variables.lastname}</h1>
+          <h2>${variables.role}</h2>
+          <h3>${variables.city}, ${variables.country}</h3>
+          <ul class="${variables.socialMediaPosition}">
+            <li><a href="https://twitter.com/${variables.twitter}"><i class="fa fa-twitter"></i></a></li>
+            <li><a href="https://github.com/${variables.github}"><i class="fa fa-github"></i></a></li>
+            <li><a href="https://linkedin.com/${variables.linkedin}"><i class="fa fa-linkedin"></i></a></li>
+            <li><a href="https://instagram.com/${variables.instagram}"><i class="fa fa-instagram"></i></a></li>
           </ul>
         </div>
     `;
@@ -735,17 +735,17 @@ window.onload = function () {
     // this is the url for the profile avatar
     avatarURL: "https://randomuser.me/api/portraits/women/42.jpg",
     // social media bar position (left or right)
-    socialMediaPosition: "left",
+    socialMediaPosition: "position-right",
     // social media usernames
-    twitter: null,
+    twitter: "alesanchezr",
     github: "alesanchezr",
-    linkedin: null,
-    instagram: null,
-    name: null,
-    lastname: null,
-    role: null,
-    country: null,
-    city: null
+    linkedin: "alesanchezr",
+    instagram: "alesanchezr",
+    name: "Lucy",
+    lastname: "Boilett",
+    role: "Web Developer",
+    country: "USA",
+    city: "Miami"
   };
   render(window.variables);
   document.querySelectorAll(".picker").forEach(function (elm) {
