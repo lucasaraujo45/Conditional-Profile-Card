@@ -1,4 +1,5 @@
 import "../style/index.scss";
+var helpers = require('prettify');
 
 /**
  *  EDIT ONLY INSIDE THIS RENDER FUNCTION
@@ -66,7 +67,7 @@ window.onload = function() {
       let values = {};
       values[attribute] =
         this.value == ""
-          ? null
+          ? " "
           : this.value == "true"
             ? true
             : this.value == "false"
@@ -76,3 +77,15 @@ window.onload = function() {
     });
   });
 };
+
+$(window).load(function() {
+  $(".col-3 input").val("");
+
+  $(".input-effect input").focusout(function() {
+    if ($(this).val() != "") {
+      $(this).addClass("has-content");
+    } else {
+      $(this).removeClass("has-content");
+    }
+  });
+});

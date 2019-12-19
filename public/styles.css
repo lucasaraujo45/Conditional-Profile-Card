@@ -1,0 +1,18 @@
+:focus{outline: none;}
+
+.col-2 .col-3{float: left; margin-left: 5px; margin-right: 5px; position: relative;} /* necessary to give position: relative to parent. */
+input[type="text"]{font: 15px/24px "Lato", Arial, sans-serif; color: #333; box-sizing: border-box; letter-spacing: 1px;}
+
+.effect {border: 0; padding: 7px 0; border-bottom: 1px solid #ccc;}
+
+.effect ~ .focus-border{position: absolute; bottom: 0; left: 50%; width: 0; height: 2px; background-color: #3399FF; transition: 0.4s;}
+.effect:focus ~ .focus-border{width: 100%; transition: 0.4s; left: 0;}
+
+ul{
+    list-style-type:none;
+}
+.filters li {
+    display: inline-block;
+    max-width: 100%;
+    padding: 3px;
+}
