@@ -1,6 +1,7 @@
 import "../style/index.scss";
 var helpers = require("prettify");
 
+
 /**
  *  EDIT ONLY INSIDE THIS RENDER FUNCTION
  *  This function is called every time the user changes types or changes any input
@@ -18,7 +19,11 @@ function render(variables = {}) {
           <h1>${variables.name} ${variables.lastname}</h1>
           <h2>${variables.role}</h2>
           <h3>${variables.city}, ${variables.country}</h3>
-          <ul class="${variables.socialMediaPosition}">
+          <ul class="${
+            variables.socialMediaPosition === ""
+              ? "smHide"
+              : variables.socialMediaPosition
+          }">
             <li><a href="https://twitter.com/${
               variables.twitter
             }"><i class="fa fa-twitter"></i></a></li>
@@ -48,7 +53,7 @@ window.onload = function() {
     // this is the url for the profile avatar
     avatarURL: "https://randomuser.me/api/portraits/women/42.jpg",
     // social media bar position (left or right)
-    socialMediaPosition: "position-right",
+    socialMediaPosition: "",
     // social media usernames
     twitter: "alesanchezr",
     github: "alesanchezr",
@@ -67,7 +72,7 @@ window.onload = function() {
       let values = {};
       values[attribute] =
         this.value == ""
-          ? " "
+          ? null
           : this.value == "true"
             ? true
             : this.value == "false"
@@ -77,6 +82,8 @@ window.onload = function() {
     });
   });
 };
+
+
 
 $(window).load(function() {
   $(".col-3 input").val("");
