@@ -1,5 +1,5 @@
 import "../style/index.scss";
-var helpers = require('prettify');
+var helpers = require("prettify");
 
 /**
  *  EDIT ONLY INSIDE THIS RENDER FUNCTION

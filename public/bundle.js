@@ -10568,6 +10568,8358 @@ return jQuery;
 
 /***/ }),
 
+/***/ "./node_modules/js-prettify/js/index.js":
+/*!**********************************************!*\
+  !*** ./node_modules/js-prettify/js/index.js ***!
+  \**********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+/**
+The following batches are equivalent:
+
+var beautify_js = require('js-beautify');
+var beautify_js = require('js-beautify').js;
+var beautify_js = require('js-beautify').js_beautify;
+
+var beautify_css = require('js-beautify').css;
+var beautify_css = require('js-beautify').css_beautify;
+
+var beautify_html = require('js-beautify').html;
+var beautify_html = require('js-beautify').html_beautify;
+
+All methods returned accept two arguments, the source string and an options object.
+**/
+var js_beautify = __webpack_require__(/*! ./lib/beautify */ "./node_modules/js-prettify/js/lib/beautify.js").js_beautify;
+var css_beautify = __webpack_require__(/*! ./lib/beautify-css */ "./node_modules/js-prettify/js/lib/beautify-css.js").css_beautify;
+var html_beautify = __webpack_require__(/*! ./lib/beautify-html */ "./node_modules/js-prettify/js/lib/beautify-html.js").html_beautify;
+
+// the default is js
+var beautify = function (src, config) {
+    return js_beautify(src, config);
+};
+
+// short aliases
+beautify.js   = js_beautify;
+beautify.css  = css_beautify;
+beautify.html = html_beautify;
+
+// legacy aliases
+beautify.js_beautify   = js_beautify;
+beautify.css_beautify  = css_beautify;
+beautify.html_beautify = html_beautify;
+
+module.exports = beautify;
+
+
+/***/ }),
+
+/***/ "./node_modules/js-prettify/js/lib/beautify-css.js":
+/*!*********************************************************!*\
+  !*** ./node_modules/js-prettify/js/lib/beautify-css.js ***!
+  \*********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var __WEBPACK_AMD_DEFINE_RESULT__;/*jshint curly:true, eqeqeq:true, laxbreak:true, noempty:false */
+/*
+
+  The MIT License (MIT)
+
+  Copyright (c) 2007-2013 Einar Lielmanis and contributors.
+
+  Permission is hereby granted, free of charge, to any person
+  obtaining a copy of this software and associated documentation files
+  (the "Software"), to deal in the Software without restriction,
+  including without limitation the rights to use, copy, modify, merge,
+  publish, distribute, sublicense, and/or sell copies of the Software,
+  and to permit persons to whom the Software is furnished to do so,
+  subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+
+ CSS Beautifier
+---------------
+
+    Written by Harutyun Amirjanyan, (amirjanyan@gmail.com)
+
+    Based on code initially developed by: Einar Lielmanis, <elfz@laacz.lv>
+        http://jsbeautifier.org/
+
+    Usage:
+        css_beautify(source_text);
+        css_beautify(source_text, options);
+
+    The options are:
+        indent_size (default 4)          — indentation size,
+        indent_char (default space)      — character to indent with,
+
+    e.g
+
+    css_beautify(css_source_text, {
+      'indent_size': 1,
+      'indent_char': '\t'
+    });
+*/
+
+// http://www.w3.org/TR/CSS21/syndata.html#tokenization
+// http://www.w3.org/TR/css3-syntax/
+
+(function() {
+    function css_beautify(source_text, options) {
+        options = options || {};
+        var indentSize = options.indent_size || 4;
+        var indentCharacter = options.indent_char || ' ';
+
+        // compatibility
+        if (typeof indentSize === "string") {
+            indentSize = parseInt(indentSize, 10);
+        }
+
+
+        // tokenizer
+        var whiteRe = /^\s+$/;
+        var wordRe = /[\w$\-_]/;
+
+        var pos = -1,
+            ch;
+
+        function next() {
+            ch = source_text.charAt(++pos);
+            return ch;
+        }
+
+        function peek() {
+            return source_text.charAt(pos + 1);
+        }
+
+        function eatString(comma) {
+            var start = pos;
+            while (next()) {
+                if (ch === "\\") {
+                    next();
+                    next();
+                } else if (ch === comma) {
+                    break;
+                } else if (ch === "\n") {
+                    break;
+                }
+            }
+            return source_text.substring(start, pos + 1);
+        }
+
+        function eatWhitespace() {
+            var start = pos;
+            while (whiteRe.test(peek())) {
+                pos++;
+            }
+            return pos !== start;
+        }
+
+        function skipWhitespace() {
+            var start = pos;
+            do {} while (whiteRe.test(next()));
+            return pos !== start + 1;
+        }
+
+        function eatComment() {
+            var start = pos;
+            next();
+            while (next()) {
+                if (ch === "*" && peek() === "/") {
+                    pos++;
+                    break;
+                }
+            }
+
+            return source_text.substring(start, pos + 1);
+        }
+
+
+        function lookBack(str) {
+            return source_text.substring(pos - str.length, pos).toLowerCase() === str;
+        }
+
+        // printer
+        var indentString = source_text.match(/^[\r\n]*[\t ]*/)[0];
+        var singleIndent = Array(indentSize + 1).join(indentCharacter);
+        var indentLevel = 0;
+
+        function indent() {
+            indentLevel++;
+            indentString += singleIndent;
+        }
+
+        function outdent() {
+            indentLevel--;
+            indentString = indentString.slice(0, -indentSize);
+        }
+
+        var print = {};
+        print["{"] = function(ch) {
+            print.singleSpace();
+            output.push(ch);
+            print.newLine();
+        };
+        print["}"] = function(ch) {
+            print.newLine();
+            output.push(ch);
+            print.newLine();
+        };
+
+        print.newLine = function(keepWhitespace) {
+            if (!keepWhitespace) {
+                while (whiteRe.test(output[output.length - 1])) {
+                    output.pop();
+                }
+            }
+
+            if (output.length) {
+                output.push('\n');
+            }
+            if (indentString) {
+                output.push(indentString);
+            }
+        };
+        print.singleSpace = function() {
+            if (output.length && !whiteRe.test(output[output.length - 1])) {
+                output.push(' ');
+            }
+        };
+        var output = [];
+        if (indentString) {
+            output.push(indentString);
+        }
+        /*_____________________--------------------_____________________*/
+
+        while (true) {
+            var isAfterSpace = skipWhitespace();
+
+            if (!ch) {
+                break;
+            }
+
+
+            if (ch === '{') {
+                indent();
+                print["{"](ch);
+            } else if (ch === '}') {
+                outdent();
+                print["}"](ch);
+            } else if (ch === '"' || ch === '\'') {
+                output.push(eatString(ch));
+            } else if (ch === ';') {
+                output.push(ch, '\n', indentString);
+            } else if (ch === '/' && peek() === '*') { // comment
+                print.newLine();
+                output.push(eatComment(), "\n", indentString);
+            } else if (ch === '(') { // may be a url
+                if (lookBack("url")) {
+                    output.push(ch);
+                    eatWhitespace();
+                    if (next()) {
+                        if (ch !== ')' && ch !== '"' && ch !== '\'') {
+                            output.push(eatString(')'));
+                        } else {
+                            pos--;
+                        }
+                    }
+                } else {
+                    if (isAfterSpace) {
+                        print.singleSpace();
+                    }
+                    output.push(ch);
+                    eatWhitespace();
+                }
+            } else if (ch === ')') {
+                output.push(ch);
+            } else if (ch === ',') {
+                eatWhitespace();
+                output.push(ch);
+                print.singleSpace();
+            } else if (ch === ']') {
+                output.push(ch);
+            } else if (ch === '[' || ch === '=') { // no whitespace before or after
+                eatWhitespace();
+                output.push(ch);
+            } else {
+                if (isAfterSpace) {
+                    print.singleSpace();
+                }
+
+                output.push(ch);
+            }
+        }
+
+
+        var sweetCode = output.join('').replace(/[\n ]+$/, '');
+        return sweetCode;
+    }
+
+    if (true) {
+        // Add support for require.js
+        !(__WEBPACK_AMD_DEFINE_RESULT__ = (function(require, exports, module) {
+            exports.css_beautify = css_beautify;
+        }).call(exports, __webpack_require__, exports, module),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+    } else {}
+
+}());
+
+
+/***/ }),
+
+/***/ "./node_modules/js-prettify/js/lib/beautify-html.js":
+/*!**********************************************************!*\
+  !*** ./node_modules/js-prettify/js/lib/beautify-html.js ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;/*jshint curly:true, eqeqeq:true, laxbreak:true, noempty:false */
+/*
+
+  The MIT License (MIT)
+
+  Copyright (c) 2007-2013 Einar Lielmanis and contributors.
+
+  Permission is hereby granted, free of charge, to any person
+  obtaining a copy of this software and associated documentation files
+  (the "Software"), to deal in the Software without restriction,
+  including without limitation the rights to use, copy, modify, merge,
+  publish, distribute, sublicense, and/or sell copies of the Software,
+  and to permit persons to whom the Software is furnished to do so,
+  subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+
+ Style HTML
+---------------
+
+  Written by Nochum Sossonko, (nsossonko@hotmail.com)
+
+  Based on code initially developed by: Einar Lielmanis, <elfz@laacz.lv>
+    http://jsbeautifier.org/
+
+  Usage:
+    style_html(html_source);
+
+    style_html(html_source, options);
+
+  The options are:
+    indent_inner_html (default false)  — indent <head> and <body> sections,
+    indent_size (default 4)          — indentation size,
+    indent_char (default space)      — character to indent with,
+    wrap_line_length (default 250)            -  maximum amount of characters per line (0 = disable)
+    brace_style (default "collapse") - "collapse" | "expand" | "end-expand"
+            put braces on the same line as control statements (default), or put braces on own line (Allman / ANSI style), or just put end braces on own line.
+    unformatted (defaults to inline tags) - list of tags, that shouldn't be reformatted
+    indent_scripts (default normal)  - "keep"|"separate"|"normal"
+    preserve_newlines (default true) - whether existing line breaks before elements should be preserved
+                                        Only works before elements, not inside tags or for text.
+    max_preserve_newlines (default unlimited) - maximum number of line breaks to be preserved in one chunk
+
+    e.g.
+
+    style_html(html_source, {
+      'indent_inner_html': false,
+      'indent_size': 2,
+      'indent_char': ' ',
+      'wrap_line_length': 78,
+      'brace_style': 'expand',
+      'unformatted': ['a', 'sub', 'sup', 'b', 'i', 'u'],
+      'preserve_newlines': true,
+      'max_preserve_newlines': 5
+    });
+*/
+
+(function() {
+
+    function trim(s) {
+        return s.replace(/^\s+|\s+$/g, '');
+    }
+
+    function ltrim(s) {
+        return s.replace(/^\s+/g, '');
+    }
+
+    function style_html(html_source, options, js_beautify, css_beautify) {
+        //Wrapper function to invoke all the necessary constructors and deal with the output.
+
+        var multi_parser,
+            indent_inner_html,
+            indent_size,
+            indent_character,
+            wrap_line_length,
+            brace_style,
+            unformatted,
+            preserve_newlines,
+            max_preserve_newlines;
+
+        options = options || {};
+
+        // backwards compatibility to 1.3.4
+        if (options.wrap_line_length === undefined && options.max_char !== undefined) {
+            options.wrap_line_length = options.max_char;
+        }
+
+        indent_inner_html = options.indent_inner_html || false;
+        indent_size = parseInt(options.indent_size || 4, 10);
+        indent_character = options.indent_char || ' ';
+        brace_style = options.brace_style || 'collapse';
+        wrap_line_length = options.wrap_line_length === 0 ? 32786 : parseInt(options.wrap_line_length || 250, 10);
+        unformatted = options.unformatted || ['a', 'span', 'bdo', 'em', 'strong', 'dfn', 'code', 'samp', 'kbd', 'var', 'cite', 'abbr', 'acronym', 'q', 'sub', 'sup', 'tt', 'i', 'b', 'big', 'small', 'u', 's', 'strike', 'font', 'ins', 'del', 'pre', 'address', 'dt', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+        preserve_newlines = options.preserve_newlines || true;
+        max_preserve_newlines = preserve_newlines ? parseInt(options.max_preserve_newlines || 32786, 10) : 0;
+
+        function Parser() {
+
+            this.pos = 0; //Parser position
+            this.token = '';
+            this.current_mode = 'CONTENT'; //reflects the current Parser mode: TAG/CONTENT
+            this.tags = { //An object to hold tags, their position, and their parent-tags, initiated with default values
+                parent: 'parent1',
+                parentcount: 1,
+                parent1: ''
+            };
+            this.tag_type = '';
+            this.token_text = this.last_token = this.last_text = this.token_type = '';
+            this.newlines = 0;
+            this.indent_content = indent_inner_html;
+
+            this.Utils = { //Uilities made available to the various functions
+                whitespace: "\n\r\t ".split(''),
+                single_token: 'br,input,link,meta,!doctype,basefont,base,area,hr,wbr,param,img,isindex,?xml,embed,?php,?,?='.split(','), //all the single tags for HTML
+                extra_liners: 'head,body,/html'.split(','), //for tags that need a line of whitespace before them
+                in_array: function(what, arr) {
+                    for (var i = 0; i < arr.length; i++) {
+                        if (what === arr[i]) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            };
+
+            this.traverse_whitespace = function() {
+                var input_char = '';
+
+                input_char = this.input.charAt(this.pos);
+                if (this.Utils.in_array(input_char, this.Utils.whitespace)) {
+                    this.newlines = 0;
+                    while (this.Utils.in_array(input_char, this.Utils.whitespace)) {
+                        if (preserve_newlines && input_char === '\n' && this.newlines <= max_preserve_newlines) {
+                            this.newlines += 1;
+                        }
+
+                        this.pos++;
+                        input_char = this.input.charAt(this.pos);
+                    }
+                    return true;
+                }
+                return false;
+            };
+
+            this.get_content = function() { //function to capture regular content between tags
+
+                var input_char = '',
+                    content = [],
+                    space = false; //if a space is needed
+
+                while (this.input.charAt(this.pos) !== '<') {
+                    if (this.pos >= this.input.length) {
+                        return content.length ? content.join('') : ['', 'TK_EOF'];
+                    }
+
+                    if (this.traverse_whitespace()) {
+                        if (content.length) {
+                            space = true;
+                        }
+                        continue; //don't want to insert unnecessary space
+                    }
+
+                    input_char = this.input.charAt(this.pos);
+                    this.pos++;
+
+                    if (space) {
+                        if (this.line_char_count >= this.wrap_line_length) { //insert a line when the wrap_line_length is reached
+                            this.print_newline(false, content);
+                            this.print_indentation(content);
+                        } else {
+                            this.line_char_count++;
+                            content.push(' ');
+                        }
+                        space = false;
+                    }
+                    this.line_char_count++;
+                    content.push(input_char); //letter at-a-time (or string) inserted to an array
+                }
+                return content.length ? content.join('') : '';
+            };
+
+            this.get_contents_to = function(name) { //get the full content of a script or style to pass to js_beautify
+                if (this.pos === this.input.length) {
+                    return ['', 'TK_EOF'];
+                }
+                var input_char = '';
+                var content = '';
+                var reg_match = new RegExp('</' + name + '\\s*>', 'igm');
+                reg_match.lastIndex = this.pos;
+                var reg_array = reg_match.exec(this.input);
+                var end_script = reg_array ? reg_array.index : this.input.length; //absolute end of script
+                if (this.pos < end_script) { //get everything in between the script tags
+                    content = this.input.substring(this.pos, end_script);
+                    this.pos = end_script;
+                }
+                return content;
+            };
+
+            this.record_tag = function(tag) { //function to record a tag and its parent in this.tags Object
+                if (this.tags[tag + 'count']) { //check for the existence of this tag type
+                    this.tags[tag + 'count']++;
+                    this.tags[tag + this.tags[tag + 'count']] = this.indent_level; //and record the present indent level
+                } else { //otherwise initialize this tag type
+                    this.tags[tag + 'count'] = 1;
+                    this.tags[tag + this.tags[tag + 'count']] = this.indent_level; //and record the present indent level
+                }
+                this.tags[tag + this.tags[tag + 'count'] + 'parent'] = this.tags.parent; //set the parent (i.e. in the case of a div this.tags.div1parent)
+                this.tags.parent = tag + this.tags[tag + 'count']; //and make this the current parent (i.e. in the case of a div 'div1')
+            };
+
+            this.retrieve_tag = function(tag) { //function to retrieve the opening tag to the corresponding closer
+                if (this.tags[tag + 'count']) { //if the openener is not in the Object we ignore it
+                    var temp_parent = this.tags.parent; //check to see if it's a closable tag.
+                    while (temp_parent) { //till we reach '' (the initial value);
+                        if (tag + this.tags[tag + 'count'] === temp_parent) { //if this is it use it
+                            break;
+                        }
+                        temp_parent = this.tags[temp_parent + 'parent']; //otherwise keep on climbing up the DOM Tree
+                    }
+                    if (temp_parent) { //if we caught something
+                        this.indent_level = this.tags[tag + this.tags[tag + 'count']]; //set the indent_level accordingly
+                        this.tags.parent = this.tags[temp_parent + 'parent']; //and set the current parent
+                    }
+                    delete this.tags[tag + this.tags[tag + 'count'] + 'parent']; //delete the closed tags parent reference...
+                    delete this.tags[tag + this.tags[tag + 'count']]; //...and the tag itself
+                    if (this.tags[tag + 'count'] === 1) {
+                        delete this.tags[tag + 'count'];
+                    } else {
+                        this.tags[tag + 'count']--;
+                    }
+                }
+            };
+
+            this.get_tag = function(peek) { //function to get a full tag and parse its type
+                var input_char = '',
+                    content = [],
+                    comment = '',
+                    space = false,
+                    tag_start, tag_end,
+                    orig_pos = this.pos,
+                    orig_line_char_count = this.line_char_count;
+
+                peek = peek !== undefined ? peek : false;
+
+                do {
+                    if (this.pos >= this.input.length) {
+                        if (peek) {
+                            this.pos = orig_pos;
+                            this.line_char_count = orig_line_char_count;
+                        }
+                        return content.length ? content.join('') : ['', 'TK_EOF'];
+                    }
+
+                    input_char = this.input.charAt(this.pos);
+                    this.pos++;
+
+                    if (this.Utils.in_array(input_char, this.Utils.whitespace)) { //don't want to insert unnecessary space
+                        space = true;
+                        continue;
+                    }
+
+                    if (input_char === "'" || input_char === '"') {
+                        input_char += this.get_unformatted(input_char);
+                        space = true;
+
+                    }
+
+                    if (input_char === '=') { //no space before =
+                        space = false;
+                    }
+
+                    if (content.length && content[content.length - 1] !== '=' && input_char !== '>' && space) {
+                        //no space after = or before >
+                        if (this.line_char_count >= this.wrap_line_length) {
+                            this.print_newline(false, content);
+                            this.print_indentation(content);
+                        } else {
+                            content.push(' ');
+                            this.line_char_count++;
+                        }
+                        space = false;
+                    }
+
+                    if (input_char === '<' && !tag_start) {
+                        tag_start = this.pos - 1;
+                    }
+
+                    this.line_char_count++;
+                    content.push(input_char); //inserts character at-a-time (or string)
+
+                    if (content[1] && content[1] === '!') { //if we're in a comment, do something special
+                        // We treat all comments as literals, even more than preformatted tags
+                        // we just look for the appropriate close tag
+                        content = [this.get_comment(tag_start)];
+                        break;
+                    }
+
+                } while (input_char !== '>');
+
+                var tag_complete = content.join('');
+                var tag_index;
+                if (tag_complete.indexOf(' ') !== -1) { //if there's whitespace, thats where the tag name ends
+                    tag_index = tag_complete.indexOf(' ');
+                } else { //otherwise go with the tag ending
+                    tag_index = tag_complete.indexOf('>');
+                }
+                var tag_check = tag_complete.substring(1, tag_index).toLowerCase();
+                if (tag_complete.charAt(tag_complete.length - 2) === '/' ||
+                    this.Utils.in_array(tag_check, this.Utils.single_token)) { //if this tag name is a single tag type (either in the list or has a closing /)
+                    if (!peek) {
+                        this.tag_type = 'SINGLE';
+                    }
+                } else if (tag_check === 'script') { //for later script handling
+                    if (!peek) {
+                        this.record_tag(tag_check);
+                        this.tag_type = 'SCRIPT';
+                    }
+                } else if (tag_check === 'style') { //for future style handling (for now it justs uses get_content)
+                    if (!peek) {
+                        this.record_tag(tag_check);
+                        this.tag_type = 'STYLE';
+                    }
+                } else if (this.is_unformatted(tag_check, unformatted)) { // do not reformat the "unformatted" tags
+                    comment = this.get_unformatted('</' + tag_check + '>', tag_complete); //...delegate to get_unformatted function
+                    content.push(comment);
+                    // Preserve collapsed whitespace either before or after this tag.
+                    if (tag_start > 0 && this.Utils.in_array(this.input.charAt(tag_start - 1), this.Utils.whitespace)) {
+                        content.splice(0, 0, this.input.charAt(tag_start - 1));
+                    }
+                    tag_end = this.pos - 1;
+                    if (this.Utils.in_array(this.input.charAt(tag_end + 1), this.Utils.whitespace)) {
+                        content.push(this.input.charAt(tag_end + 1));
+                    }
+                    this.tag_type = 'SINGLE';
+                } else if (tag_check.charAt(0) === '!') { //peek for <! comment
+                    // for comments content is already correct.
+                    if (!peek) {
+                        this.tag_type = 'SINGLE';
+                        this.traverse_whitespace();
+                    }
+                } else if (!peek) {
+                    if (tag_check.charAt(0) === '/') { //this tag is a double tag so check for tag-ending
+                        this.retrieve_tag(tag_check.substring(1)); //remove it and all ancestors
+                        this.tag_type = 'END';
+                        this.traverse_whitespace();
+                    } else { //otherwise it's a start-tag
+                        this.record_tag(tag_check); //push it on the tag stack
+                        if (tag_check.toLowerCase() !== 'html') {
+                            this.indent_content = true;
+                        }
+                        this.tag_type = 'START';
+
+                        // Allow preserving of newlines after a start tag
+                        this.traverse_whitespace();
+                    }
+                    if (this.Utils.in_array(tag_check, this.Utils.extra_liners)) { //check if this double needs an extra line
+                        this.print_newline(false, this.output);
+                        if (this.output.length && this.output[this.output.length - 2] !== '\n') {
+                            this.print_newline(true, this.output);
+                        }
+                    }
+                }
+
+                if (peek) {
+                    this.pos = orig_pos;
+                    this.line_char_count = orig_line_char_count;
+                }
+
+                return content.join(''); //returns fully formatted tag
+            };
+
+            this.get_comment = function(start_pos) { //function to return comment content in its entirety
+                // this is will have very poor perf, but will work for now.
+                var comment = '',
+                    delimiter = '>',
+                    matched = false;
+
+                this.pos = start_pos;
+                input_char = this.input.charAt(this.pos);
+                this.pos++;
+
+                while (this.pos <= this.input.length) {
+                    comment += input_char;
+
+                    // only need to check for the delimiter if the last chars match
+                    if (comment[comment.length - 1] === delimiter[delimiter.length - 1] &&
+                        comment.indexOf(delimiter) !== -1) {
+                        break;
+                    }
+
+                    // only need to search for custom delimiter for the first few characters
+                    if (!matched && comment.length < 10) {
+                        if (comment.indexOf('<![if') === 0) { //peek for <![if conditional comment
+                            delimiter = '<![endif]>';
+                            matched = true;
+                        } else if (comment.indexOf('<![cdata[') === 0) { //if it's a <[cdata[ comment...
+                            delimiter = ']]>';
+                            matched = true;
+                        } else if (comment.indexOf('<![') === 0) { // some other ![ comment? ...
+                            delimiter = ']>';
+                            matched = true;
+                        } else if (comment.indexOf('<!--') === 0) { // <!-- comment ...
+                            delimiter = '-->';
+                            matched = true;
+                        }
+                    }
+
+                    input_char = this.input.charAt(this.pos);
+                    this.pos++;
+                }
+
+                return comment;
+            };
+
+            this.get_unformatted = function(delimiter, orig_tag) { //function to return unformatted content in its entirety
+
+                if (orig_tag && orig_tag.toLowerCase().indexOf(delimiter) !== -1) {
+                    return '';
+                }
+                var input_char = '';
+                var content = '';
+                var space = true;
+                do {
+
+                    if (this.pos >= this.input.length) {
+                        return content;
+                    }
+
+                    input_char = this.input.charAt(this.pos);
+                    this.pos++;
+
+                    if (this.Utils.in_array(input_char, this.Utils.whitespace)) {
+                        if (!space) {
+                            this.line_char_count--;
+                            continue;
+                        }
+                        if (input_char === '\n' || input_char === '\r') {
+                            content += '\n';
+                            /*  Don't change tab indention for unformatted blocks.  If using code for html editing, this will greatly affect <pre> tags if they are specified in the 'unformatted array'
+                for (var i=0; i<this.indent_level; i++) {
+                  content += this.indent_string;
+                }
+                space = false; //...and make sure other indentation is erased
+                */
+                            this.line_char_count = 0;
+                            continue;
+                        }
+                    }
+                    content += input_char;
+                    this.line_char_count++;
+                    space = true;
+
+
+                } while (content.toLowerCase().indexOf(delimiter) === -1);
+                return content;
+            };
+
+            this.get_token = function() { //initial handler for token-retrieval
+                var token;
+
+                if (this.last_token === 'TK_TAG_SCRIPT' || this.last_token === 'TK_TAG_STYLE') { //check if we need to format javascript
+                    var type = this.last_token.substr(7);
+                    token = this.get_contents_to(type);
+                    if (typeof token !== 'string') {
+                        return token;
+                    }
+                    return [token, 'TK_' + type];
+                }
+                if (this.current_mode === 'CONTENT') {
+                    token = this.get_content();
+                    if (typeof token !== 'string') {
+                        return token;
+                    } else {
+                        return [token, 'TK_CONTENT'];
+                    }
+                }
+
+                if (this.current_mode === 'TAG') {
+                    token = this.get_tag();
+                    if (typeof token !== 'string') {
+                        return token;
+                    } else {
+                        var tag_name_type = 'TK_TAG_' + this.tag_type;
+                        return [token, tag_name_type];
+                    }
+                }
+            };
+
+            this.get_full_indent = function(level) {
+                level = this.indent_level + level || 0;
+                if (level < 1) {
+                    return '';
+                }
+
+                return Array(level + 1).join(this.indent_string);
+            };
+
+            this.is_unformatted = function(tag_check, unformatted) {
+                //is this an HTML5 block-level link?
+                if (!this.Utils.in_array(tag_check, unformatted)) {
+                    return false;
+                }
+
+                if (tag_check.toLowerCase() !== 'a' || !this.Utils.in_array('a', unformatted)) {
+                    return true;
+                }
+
+                //at this point we have an  tag; is its first child something we want to remain
+                //unformatted?
+                var next_tag = this.get_tag(true /* peek. */ );
+
+                // tets next_tag to see if it is just html tag (no external content)
+                var tag = (next_tag || "").match(/^\s*<\s*\/?([a-z]*)\s*[^>]*>\s*$/);
+
+                // if next_tag comes back but is not an isolated tag, then
+                // let's treat the 'a' tag as having content
+                // and respect the unformatted option
+                if (!tag || this.Utils.in_array(tag, unformatted)) {
+                    return true;
+                } else {
+                    return false;
+                }
+            };
+
+            this.printer = function(js_source, indent_character, indent_size, wrap_line_length, brace_style) { //handles input/output and some other printing functions
+
+                this.input = js_source || ''; //gets the input for the Parser
+                this.output = [];
+                this.indent_character = indent_character;
+                this.indent_string = '';
+                this.indent_size = indent_size;
+                this.brace_style = brace_style;
+                this.indent_level = 0;
+                this.wrap_line_length = wrap_line_length;
+                this.line_char_count = 0; //count to see if wrap_line_length was exceeded
+
+                for (var i = 0; i < this.indent_size; i++) {
+                    this.indent_string += this.indent_character;
+                }
+
+                this.print_newline = function(force, arr) {
+                    this.line_char_count = 0;
+                    if (!arr || !arr.length) {
+                        return;
+                    }
+                    if (force || (arr[arr.length - 1] !== '\n')) { //we might want the extra line
+                        arr.push('\n');
+                    }
+                };
+
+                this.print_indentation = function(arr) {
+                    for (var i = 0; i < this.indent_level; i++) {
+                        arr.push(this.indent_string);
+                        this.line_char_count += this.indent_string.length;
+                    }
+                };
+
+                this.print_token = function(text) {
+                    if (text || text !== '') {
+                        if (this.output.length && this.output[this.output.length - 1] === '\n') {
+                            this.print_indentation(this.output);
+                            text = ltrim(text);
+                        }
+                    }
+                    this.print_token_raw(text);
+                };
+
+                this.print_token_raw = function(text) {
+                    if (text && text !== '') {
+                        if (text.length > 1 && text[text.length - 1] === '\n') {
+                            // unformatted tags can grab newlines as their last character
+                            this.output.push(text.slice(0, -1));
+                            this.print_newline(false, this.output);
+                        } else {
+                            this.output.push(text);
+                        }
+                    }
+
+                    for (var n = 0; n < this.newlines; n++) {
+                        this.print_newline(n > 0, this.output);
+                    }
+                    this.newlines = 0;
+                };
+
+                this.indent = function() {
+                    this.indent_level++;
+                };
+
+                this.unindent = function() {
+                    if (this.indent_level > 0) {
+                        this.indent_level--;
+                    }
+                };
+            };
+            return this;
+        }
+
+        /*_____________________--------------------_____________________*/
+
+        multi_parser = new Parser(); //wrapping functions Parser
+        multi_parser.printer(html_source, indent_character, indent_size, wrap_line_length, brace_style); //initialize starting values
+
+        while (true) {
+            var t = multi_parser.get_token();
+            multi_parser.token_text = t[0];
+            multi_parser.token_type = t[1];
+
+            if (multi_parser.token_type === 'TK_EOF') {
+                break;
+            }
+
+            switch (multi_parser.token_type) {
+                case 'TK_TAG_START':
+                    multi_parser.print_newline(false, multi_parser.output);
+                    multi_parser.print_token(multi_parser.token_text);
+                    if (multi_parser.indent_content) {
+                        multi_parser.indent();
+                        multi_parser.indent_content = false;
+                    }
+                    multi_parser.current_mode = 'CONTENT';
+                    break;
+                case 'TK_TAG_STYLE':
+                case 'TK_TAG_SCRIPT':
+                    multi_parser.print_newline(false, multi_parser.output);
+                    multi_parser.print_token(multi_parser.token_text);
+                    multi_parser.current_mode = 'CONTENT';
+                    break;
+                case 'TK_TAG_END':
+                    //Print new line only if the tag has no content and has child
+                    if (multi_parser.last_token === 'TK_CONTENT' && multi_parser.last_text === '') {
+                        var tag_name = multi_parser.token_text.match(/\w+/)[0];
+                        var tag_extracted_from_last_output = multi_parser.output[multi_parser.output.length - 1].match(/<\s*(\w+)/);
+                        if (tag_extracted_from_last_output === null ||
+                            tag_extracted_from_last_output[1] !== tag_name) {
+                            multi_parser.print_newline(false, multi_parser.output);
+                        }
+                    }
+                    multi_parser.print_token(multi_parser.token_text);
+                    multi_parser.current_mode = 'CONTENT';
+                    break;
+                case 'TK_TAG_SINGLE':
+                    // Don't add a newline before elements that should remain unformatted.
+                    var tag_check = multi_parser.token_text.match(/^\s*<([a-z]+)/i);
+                    if (!tag_check || !multi_parser.Utils.in_array(tag_check[1], unformatted)) {
+                        multi_parser.print_newline(false, multi_parser.output);
+                    }
+                    multi_parser.print_token(multi_parser.token_text);
+                    multi_parser.current_mode = 'CONTENT';
+                    break;
+                case 'TK_CONTENT':
+                    multi_parser.print_token(multi_parser.token_text);
+                    multi_parser.current_mode = 'TAG';
+                    break;
+                case 'TK_STYLE':
+                case 'TK_SCRIPT':
+                    if (multi_parser.token_text !== '') {
+                        multi_parser.print_newline(false, multi_parser.output);
+                        var text = multi_parser.token_text,
+                            _beautifier,
+                            script_indent_level = 1;
+                        if (multi_parser.token_type === 'TK_SCRIPT') {
+                            _beautifier = typeof js_beautify === 'function' && js_beautify;
+                        } else if (multi_parser.token_type === 'TK_STYLE') {
+                            _beautifier = typeof css_beautify === 'function' && css_beautify;
+                        }
+
+                        if (options.indent_scripts === "keep") {
+                            script_indent_level = 0;
+                        } else if (options.indent_scripts === "separate") {
+                            script_indent_level = -multi_parser.indent_level;
+                        }
+
+                        var indentation = multi_parser.get_full_indent(script_indent_level);
+                        if (_beautifier) {
+                            // call the Beautifier if avaliable
+                            text = _beautifier(text.replace(/^\s*/, indentation), options);
+                        } else {
+                            // simply indent the string otherwise
+                            var white = text.match(/^\s*/)[0];
+                            var _level = white.match(/[^\n\r]*$/)[0].split(multi_parser.indent_string).length - 1;
+                            var reindent = multi_parser.get_full_indent(script_indent_level - _level);
+                            text = text.replace(/^\s*/, indentation)
+                                .replace(/\r\n|\r|\n/g, '\n' + reindent)
+                                .replace(/\s+$/, '');
+                        }
+                        if (text) {
+                            multi_parser.print_token_raw(indentation + trim(text));
+                            multi_parser.print_newline(false, multi_parser.output);
+                        }
+                    }
+                    multi_parser.current_mode = 'TAG';
+                    break;
+            }
+            multi_parser.last_token = multi_parser.token_type;
+            multi_parser.last_text = multi_parser.token_text;
+        }
+        return multi_parser.output.join('');
+    }
+
+    if (true) {
+        // Add support for require.js
+        !(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(/*! ./beautify.js */ "./node_modules/js-prettify/js/lib/beautify.js"), __webpack_require__(/*! ./beautify-css.js */ "./node_modules/js-prettify/js/lib/beautify-css.js")], __WEBPACK_AMD_DEFINE_RESULT__ = (function(js_beautify, css_beautify) {
+            return {
+              html_beautify: function(html_source, options) {
+                return style_html(html_source, options, js_beautify, css_beautify);
+              }
+            };
+        }).apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+    } else { var css_beautify, js_beautify; }
+
+}());
+
+
+/***/ }),
+
+/***/ "./node_modules/js-prettify/js/lib/beautify.js":
+/*!*****************************************************!*\
+  !*** ./node_modules/js-prettify/js/lib/beautify.js ***!
+  \*****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;/*jshint curly:true, eqeqeq:true, laxbreak:true, noempty:false */
+/*
+
+  The MIT License (MIT)
+
+  Copyright (c) 2007-2013 Einar Lielmanis and contributors.
+
+  Permission is hereby granted, free of charge, to any person
+  obtaining a copy of this software and associated documentation files
+  (the "Software"), to deal in the Software without restriction,
+  including without limitation the rights to use, copy, modify, merge,
+  publish, distribute, sublicense, and/or sell copies of the Software,
+  and to permit persons to whom the Software is furnished to do so,
+  subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+ JS Beautifier
+---------------
+
+
+  Written by Einar Lielmanis, <einar@jsbeautifier.org>
+      http://jsbeautifier.org/
+
+  Originally converted to javascript by Vital, <vital76@gmail.com>
+  "End braces on own line" added by Chris J. Shull, <chrisjshull@gmail.com>
+  Parsing improvements for brace-less statements by Liam Newman <bitwiseman@gmail.com>
+
+
+  Usage:
+    js_beautify(js_source_text);
+    js_beautify(js_source_text, options);
+
+  The options are:
+    indent_size (default 4)          - indentation size,
+    indent_char (default space)      - character to indent with,
+    preserve_newlines (default true) - whether existing line breaks should be preserved,
+    max_preserve_newlines (default unlimited) - maximum number of line breaks to be preserved in one chunk,
+
+    jslint_happy (default false) - if true, then jslint-stricter mode is enforced.
+
+            jslint_happy   !jslint_happy
+            ---------------------------------
+             function ()      function()
+
+    brace_style (default "collapse") - "collapse" | "expand" | "end-expand"
+            put braces on the same line as control statements (default), or put braces on own line (Allman / ANSI style), or just put end braces on own line.
+
+    space_before_conditional (default true) - should the space before conditional statement be added, "if(true)" vs "if (true)",
+
+    unescape_strings (default false) - should printable characters in strings encoded in \xNN notation be unescaped, "example" vs "\x65\x78\x61\x6d\x70\x6c\x65"
+
+    wrap_line_length (default unlimited) - lines should wrap at next opportunity after this number of characters.
+          NOTE: This is not a hard limit. Lines will continue until a point where a newline would
+                be preserved if it were present.
+
+    e.g
+
+    js_beautify(js_source_text, {
+      'indent_size': 1,
+      'indent_char': '\t'
+    });
+
+*/
+
+
+(function() {
+    function js_beautify(js_source_text, options) {
+        "use strict";
+        var beautifier = new Beautifier(js_source_text, options);
+        return beautifier.beautify();
+    }
+
+    function Beautifier(js_source_text, options) {
+        "use strict";
+        var input, output_lines;
+        var token_text, token_type, last_type, last_last_text, indent_string;
+        var flags, previous_flags, flag_store;
+        var whitespace, wordchar, punct, parser_pos, line_starters, digits;
+        var prefix;
+        var input_wanted_newline;
+        var output_wrapped, output_space_before_token;
+        var input_length, n_newlines, whitespace_before_token;
+        var handlers, MODE, opt;
+        var preindent_string = '';
+
+        whitespace = "\n\r\t ".split('');
+        wordchar = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$'.split('');
+        digits = '0123456789'.split('');
+
+        punct = '+ - * / % & ++ -- = += -= *= /= %= == === != !== > < >= <= >> << >>> >>>= >>= <<= && &= | || ! !! , : ? ^ ^= |= ::';
+        punct += ' <%= <% %> <?= <? ?>'; // try to be a good boy and try not to break the markup language identifiers
+        punct = punct.split(' ');
+
+        // words which should always start on new line.
+        line_starters = 'continue,try,throw,return,var,if,switch,case,default,for,while,break,function'.split(',');
+
+        MODE = {
+            BlockStatement: 'BlockStatement', // 'BLOCK'
+            Statement: 'Statement', // 'STATEMENT'
+            ObjectLiteral: 'ObjectLiteral', // 'OBJECT',
+            ArrayLiteral: 'ArrayLiteral', //'[EXPRESSION]',
+            ForInitializer: 'ForInitializer', //'(FOR-EXPRESSION)',
+            Conditional: 'Conditional', //'(COND-EXPRESSION)',
+            Expression: 'Expression' //'(EXPRESSION)'
+        };
+
+        handlers = {
+            'TK_START_EXPR': handle_start_expr,
+            'TK_END_EXPR': handle_end_expr,
+            'TK_START_BLOCK': handle_start_block,
+            'TK_END_BLOCK': handle_end_block,
+            'TK_WORD': handle_word,
+            'TK_SEMICOLON': handle_semicolon,
+            'TK_STRING': handle_string,
+            'TK_EQUALS': handle_equals,
+            'TK_OPERATOR': handle_operator,
+            'TK_COMMA': handle_comma,
+            'TK_BLOCK_COMMENT': handle_block_comment,
+            'TK_INLINE_COMMENT': handle_inline_comment,
+            'TK_COMMENT': handle_comment,
+            'TK_DOT': handle_dot,
+            'TK_UNKNOWN': handle_unknown
+        };
+
+        function create_flags(flags_base, mode) {
+            var next_indent_level = 0;
+            if (flags_base) {
+                next_indent_level = flags_base.indentation_level;
+                next_indent_level += (flags_base.var_line && flags_base.var_line_reindented) ? 1 : 0;
+                if (!just_added_newline() &&
+                    flags_base.line_indent_level > next_indent_level) {
+                    next_indent_level = flags_base.line_indent_level;
+                }
+            }
+
+            var next_flags = {
+                mode: mode,
+                parent: flags_base,
+                last_text: flags_base ? flags_base.last_text : '', // last token text
+                last_word: flags_base ? flags_base.last_word : '', // last 'TK_WORD' passed
+                var_line: false,
+                var_line_tainted: false,
+                var_line_reindented: false,
+                in_html_comment: false,
+                multiline_frame: false,
+                if_block: false,
+                do_block: false,
+                do_while: false,
+                in_case_statement: false, // switch(..){ INSIDE HERE }
+                in_case: false, // we're on the exact line with "case 0:"
+                case_body: false, // the indented case-action block
+                indentation_level: next_indent_level,
+                line_indent_level: flags_base ? flags_base.line_indent_level : next_indent_level,
+                start_line_index: output_lines.length,
+                ternary_depth: 0
+            }
+            return next_flags;
+        }
+
+        // Using object instead of string to allow for later expansion of info about each line
+
+        function create_output_line() {
+            return {
+                text: []
+            };
+        }
+
+        // Some interpreters have unexpected results with foo = baz || bar;
+        options = options ? options : {};
+        opt = {};
+
+        // compatibility
+        if (options.space_after_anon_function !== undefined && options.jslint_happy === undefined) {
+            options.jslint_happy = options.space_after_anon_function;
+        }
+        if (options.braces_on_own_line !== undefined) { //graceful handling of deprecated option
+            opt.brace_style = options.braces_on_own_line ? "expand" : "collapse";
+        }
+        opt.brace_style = options.brace_style ? options.brace_style : (opt.brace_style ? opt.brace_style : "collapse");
+
+        // graceful handling of deprecated option
+        if (opt.brace_style === "expand-strict") {
+            opt.brace_style = "expand";
+        }
+
+
+        opt.indent_size = options.indent_size ? parseInt(options.indent_size, 10) : 4;
+        opt.indent_char = options.indent_char ? options.indent_char : ' ';
+        opt.preserve_newlines = (options.preserve_newlines === undefined) ? true : options.preserve_newlines;
+        opt.break_chained_methods = (options.break_chained_methods === undefined) ? false : options.break_chained_methods;
+        opt.max_preserve_newlines = (options.max_preserve_newlines === undefined) ? 0 : parseInt(options.max_preserve_newlines, 10);
+        opt.space_in_paren = (options.space_in_paren === undefined) ? false : options.space_in_paren;
+        opt.jslint_happy = (options.jslint_happy === undefined) ? false : options.jslint_happy;
+        opt.keep_array_indentation = (options.keep_array_indentation === undefined) ? false : options.keep_array_indentation;
+        opt.space_before_conditional = (options.space_before_conditional === undefined) ? true : options.space_before_conditional;
+        opt.unescape_strings = (options.unescape_strings === undefined) ? false : options.unescape_strings;
+        opt.wrap_line_length = (options.wrap_line_length === undefined) ? 0 : parseInt(options.wrap_line_length, 10);
+        opt.e4x = (options.e4x === undefined) ? false : options.e4x;
+
+
+        //----------------------------------
+        indent_string = '';
+        while (opt.indent_size > 0) {
+            indent_string += opt.indent_char;
+            opt.indent_size -= 1;
+        }
+
+        while (js_source_text && (js_source_text.charAt(0) === ' ' || js_source_text.charAt(0) === '\t')) {
+            preindent_string += js_source_text.charAt(0);
+            js_source_text = js_source_text.substring(1);
+        }
+        input = js_source_text;
+        // cache the source's length.
+        input_length = js_source_text.length;
+
+        last_type = 'TK_START_BLOCK'; // last token type
+        last_last_text = ''; // pre-last token text
+        output_lines = [create_output_line()];
+        output_wrapped = false;
+        output_space_before_token = false;
+        whitespace_before_token = [];
+
+        // Stack of parsing/formatting states, including MODE.
+        // We tokenize, parse, and output in an almost purely a forward-only stream of token input
+        // and formatted output.  This makes the beautifier less accurate than full parsers
+        // but also far more tolerant of syntax errors.
+        //
+        // For example, the default mode is MODE.BlockStatement. If we see a '{' we push a new frame of type
+        // MODE.BlockStatement on the the stack, even though it could be object literal.  If we later
+        // encounter a ":", we'll switch to to MODE.ObjectLiteral.  If we then see a ";",
+        // most full parsers would die, but the beautifier gracefully falls back to
+        // MODE.BlockStatement and continues on.
+        flag_store = [];
+        set_mode(MODE.BlockStatement);
+
+        parser_pos = 0;
+
+        this.beautify = function() {
+            /*jshint onevar:true */
+            var t, i, keep_whitespace, sweet_code;
+
+            while (true) {
+                t = get_next_token();
+                token_text = t[0];
+                token_type = t[1];
+
+                if (token_type === 'TK_EOF') {
+                    break;
+                }
+
+                keep_whitespace = opt.keep_array_indentation && is_array(flags.mode);
+                input_wanted_newline = n_newlines > 0;
+
+                if (keep_whitespace) {
+                    for (i = 0; i < n_newlines; i += 1) {
+                        print_newline(i > 0);
+                    }
+                } else {
+                    if (opt.max_preserve_newlines && n_newlines > opt.max_preserve_newlines) {
+                        n_newlines = opt.max_preserve_newlines;
+                    }
+
+                    if (opt.preserve_newlines) {
+                        if (n_newlines > 1) {
+                            print_newline();
+                            for (i = 1; i < n_newlines; i += 1) {
+                                print_newline(true);
+                            }
+                        }
+                    }
+                }
+
+                handlers[token_type]();
+
+                // The cleanest handling of inline comments is to treat them as though they aren't there.
+                // Just continue formatting and the behavior should be logical.
+                // Also ignore unknown tokens.  Again, this should result in better behavior.
+                if (token_type !== 'TK_INLINE_COMMENT' && token_type !== 'TK_COMMENT' &&
+                    token_type !== 'TK_UNKNOWN') {
+                    last_last_text = flags.last_text;
+                    last_type = token_type;
+                    flags.last_text = token_text;
+                }
+            }
+
+
+            sweet_code = output_lines[0].text.join('');
+            for (var line_index = 1; line_index < output_lines.length; line_index++) {
+                sweet_code += '\n' + output_lines[line_index].text.join('');
+            }
+            sweet_code = sweet_code.replace(/[\r\n ]+$/, '');
+            return sweet_code;
+        };
+
+        function trim_output(eat_newlines) {
+            eat_newlines = (eat_newlines === undefined) ? false : eat_newlines;
+
+            if (output_lines.length) {
+                trim_output_line(output_lines[output_lines.length - 1], eat_newlines);
+
+                while (eat_newlines && output_lines.length > 1 &&
+                    output_lines[output_lines.length - 1].text.length === 0) {
+                    output_lines.pop();
+                    trim_output_line(output_lines[output_lines.length - 1], eat_newlines);
+                }
+            }
+        }
+
+        function trim_output_line(line) {
+            while (line.text.length &&
+                (line.text[line.text.length - 1] === ' ' ||
+                    line.text[line.text.length - 1] === indent_string ||
+                    line.text[line.text.length - 1] === preindent_string)) {
+                line.text.pop();
+            }
+        }
+
+        function trim(s) {
+            return s.replace(/^\s+|\s+$/g, '');
+        }
+
+        // we could use just string.split, but
+        // IE doesn't like returning empty strings
+
+        function split_newlines(s) {
+            //return s.split(/\x0d\x0a|\x0a/);
+
+            s = s.replace(/\x0d/g, '');
+            var out = [],
+                idx = s.indexOf("\n");
+            while (idx !== -1) {
+                out.push(s.substring(0, idx));
+                s = s.substring(idx + 1);
+                idx = s.indexOf("\n");
+            }
+            if (s.length) {
+                out.push(s);
+            }
+            return out;
+        }
+
+        function just_added_newline() {
+            var line = output_lines[output_lines.length - 1];
+            return line.text.length === 0;
+        }
+
+        function just_added_blankline() {
+            if (just_added_newline()) {
+                if (output_lines.length === 1) {
+                    return true; // start of the file and newline = blank
+                }
+
+                var line = output_lines[output_lines.length - 2];
+                return line.text.length === 0;
+            }
+            return false;
+        }
+
+        function allow_wrap_or_preserved_newline(force_linewrap) {
+            force_linewrap = (force_linewrap === undefined) ? false : force_linewrap;
+            if (opt.wrap_line_length && !force_linewrap) {
+                var line = output_lines[output_lines.length - 1];
+                var proposed_line_length = 0;
+                // never wrap the first token of a line.
+                if (line.text.length > 0) {
+                    proposed_line_length = line.text.join('').length + token_text.length +
+                        (output_space_before_token ? 1 : 0);
+                    if (proposed_line_length >= opt.wrap_line_length) {
+                        force_linewrap = true;
+                    }
+                }
+            }
+            if (((opt.preserve_newlines && input_wanted_newline) || force_linewrap) && !just_added_newline()) {
+                print_newline(false, true);
+
+                // Expressions and array literals already indent their contents.
+                if (!(is_array(flags.mode) || is_expression(flags.mode))) {
+                    output_wrapped = true;
+                }
+            }
+        }
+
+        function print_newline(force_newline, preserve_statement_flags) {
+            output_wrapped = false;
+            output_space_before_token = false;
+
+            if (!preserve_statement_flags) {
+                if (flags.last_text !== ';') {
+                    while (flags.mode === MODE.Statement && !flags.if_block && !flags.do_block) {
+                        restore_mode();
+                    }
+                }
+            }
+
+            if (output_lines.length === 1 && just_added_newline()) {
+                return; // no newline on start of file
+            }
+
+            if (force_newline || !just_added_newline()) {
+                flags.multiline_frame = true;
+                output_lines.push(create_output_line());
+            }
+        }
+
+        function print_token_line_indentation() {
+            if (just_added_newline()) {
+                var line = output_lines[output_lines.length - 1];
+                if (opt.keep_array_indentation && is_array(flags.mode) && input_wanted_newline) {
+                    // prevent removing of this whitespace as redundant
+                    line.text.push('');
+                    for (var i = 0; i < whitespace_before_token.length; i += 1) {
+                        line.text.push(whitespace_before_token[i]);
+                    }
+                } else {
+                    if (preindent_string) {
+                        line.text.push(preindent_string);
+                    }
+
+                    print_indent_string(flags.indentation_level +
+                        (flags.var_line && flags.var_line_reindented ? 1 : 0) +
+                        (output_wrapped ? 1 : 0));
+                }
+            }
+        }
+
+        function print_indent_string(level) {
+            // Never indent your first output indent at the start of the file
+            if (output_lines.length > 1) {
+                var line = output_lines[output_lines.length - 1];
+
+                flags.line_indent_level = level;
+                for (var i = 0; i < level; i += 1) {
+                    line.text.push(indent_string);
+                }
+            }
+        }
+
+        function print_token_space_before() {
+            var line = output_lines[output_lines.length - 1];
+            if (output_space_before_token && line.text.length) {
+                var last_output = line.text[line.text.length - 1];
+                if (last_output !== ' ' && last_output !== indent_string) { // prevent occassional duplicate space
+                    line.text.push(' ');
+                }
+            }
+        }
+
+        function print_token(printable_token) {
+            printable_token = printable_token || token_text;
+            print_token_line_indentation();
+            output_wrapped = false;
+            print_token_space_before();
+            output_space_before_token = false;
+            output_lines[output_lines.length - 1].text.push(printable_token);
+        }
+
+        function indent() {
+            flags.indentation_level += 1;
+        }
+
+        function deindent() {
+            if (flags.indentation_level > 0 &&
+                ((!flags.parent) || flags.indentation_level > flags.parent.indentation_level))
+                flags.indentation_level -= 1;
+        }
+
+        function remove_redundant_indentation(frame) {
+            // This implementation is effective but has some issues:
+            //     - less than great performance due to array splicing
+            //     - can cause line wrap to happen too soon due to indent removal
+            //           after wrap points are calculated
+            // These issues are minor compared to ugly indentation.
+
+            if (frame.multiline_frame) return;
+
+            // remove one indent from each line inside this section
+            var index = frame.start_line_index;
+            var splice_index = 0;
+            var line;
+
+            while (index < output_lines.length) {
+                line = output_lines[index];
+                index++;
+
+                // skip empty lines
+                if (line.text.length === 0) {
+                    continue;
+                }
+
+                // skip the preindent string if present
+                if (preindent_string && line.text[0] === preindent_string) {
+                    splice_index = 1;
+                } else {
+                    splice_index = 0;
+                }
+
+                // remove one indent, if present
+                if (line.text[splice_index] === indent_string) {
+                    line.text.splice(splice_index, 1);
+                }
+            }
+        }
+
+        function set_mode(mode) {
+            if (flags) {
+                flag_store.push(flags);
+                previous_flags = flags;
+            } else {
+                previous_flags = create_flags(null, mode);
+            }
+
+            flags = create_flags(previous_flags, mode);
+        }
+
+        function is_array(mode) {
+            return mode === MODE.ArrayLiteral;
+        }
+
+        function is_expression(mode) {
+            return in_array(mode, [MODE.Expression, MODE.ForInitializer, MODE.Conditional]);
+        }
+
+        function restore_mode() {
+            if (flag_store.length > 0) {
+                previous_flags = flags;
+                flags = flag_store.pop();
+            }
+        }
+
+        function start_of_statement() {
+            if (
+                (flags.last_text === 'do' ||
+                    (flags.last_text === 'else' && token_text !== 'if') ||
+                    (last_type === 'TK_END_EXPR' && (previous_flags.mode === MODE.ForInitializer || previous_flags.mode === MODE.Conditional)))) {
+                // Issue #276:
+                // If starting a new statement with [if, for, while, do], push to a new line.
+                // if (a) if (b) if(c) d(); else e(); else f();
+                allow_wrap_or_preserved_newline(
+                    in_array(token_text, ['do', 'for', 'if', 'while']));
+
+                set_mode(MODE.Statement);
+                // Issue #275:
+                // If starting on a newline, all of a statement should be indented.
+                // if not, use line wrapping logic for indent.
+                if (just_added_newline()) {
+                    indent();
+                    output_wrapped = false;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        function all_lines_start_with(lines, c) {
+            for (var i = 0; i < lines.length; i++) {
+                var line = trim(lines[i]);
+                if (line.charAt(0) !== c) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function is_special_word(word) {
+            return in_array(word, ['case', 'return', 'do', 'if', 'throw', 'else']);
+        }
+
+        function in_array(what, arr) {
+            for (var i = 0; i < arr.length; i += 1) {
+                if (arr[i] === what) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function unescape_string(s) {
+            var esc = false,
+                out = '',
+                pos = 0,
+                s_hex = '',
+                escaped = 0,
+                c;
+
+            while (esc || pos < s.length) {
+
+                c = s.charAt(pos);
+                pos++;
+
+                if (esc) {
+                    esc = false;
+                    if (c === 'x') {
+                        // simple hex-escape \x24
+                        s_hex = s.substr(pos, 2);
+                        pos += 2;
+                    } else if (c === 'u') {
+                        // unicode-escape, \u2134
+                        s_hex = s.substr(pos, 4);
+                        pos += 4;
+                    } else {
+                        // some common escape, e.g \n
+                        out += '\\' + c;
+                        continue;
+                    }
+                    if (!s_hex.match(/^[0123456789abcdefABCDEF]+$/)) {
+                        // some weird escaping, bail out,
+                        // leaving whole string intact
+                        return s;
+                    }
+
+                    escaped = parseInt(s_hex, 16);
+
+                    if (escaped >= 0x00 && escaped < 0x20) {
+                        // leave 0x00...0x1f escaped
+                        if (c === 'x') {
+                            out += '\\x' + s_hex;
+                        } else {
+                            out += '\\u' + s_hex;
+                        }
+                        continue;
+                    } else if (escaped === 0x22 || escaped === 0x27 || escaped === 0x5c) {
+                        // single-quote, apostrophe, backslash - escape these
+                        out += '\\' + String.fromCharCode(escaped);
+                    } else if (c === 'x' && escaped > 0x7e && escaped <= 0xff) {
+                        // we bail out on \x7f..\xff,
+                        // leaving whole string escaped,
+                        // as it's probably completely binary
+                        return s;
+                    } else {
+                        out += String.fromCharCode(escaped);
+                    }
+                } else if (c === '\\') {
+                    esc = true;
+                } else {
+                    out += c;
+                }
+            }
+            return out;
+        }
+
+        function is_next(find) {
+            var local_pos = parser_pos;
+            var c = input.charAt(local_pos);
+            while (in_array(c, whitespace) && c !== find) {
+                local_pos++;
+                if (local_pos >= input_length) {
+                    return false;
+                }
+                c = input.charAt(local_pos);
+            }
+            return c === find;
+        }
+
+        function get_next_token() {
+            var i, resulting_string;
+
+            n_newlines = 0;
+
+            if (parser_pos >= input_length) {
+                return ['', 'TK_EOF'];
+            }
+
+            input_wanted_newline = false;
+            whitespace_before_token = [];
+
+            var c = input.charAt(parser_pos);
+            parser_pos += 1;
+
+            while (in_array(c, whitespace)) {
+
+                if (c === '\n') {
+                    n_newlines += 1;
+                    whitespace_before_token = [];
+                } else if (n_newlines) {
+                    if (c === indent_string) {
+                        whitespace_before_token.push(indent_string);
+                    } else if (c !== '\r') {
+                        whitespace_before_token.push(' ');
+                    }
+                }
+
+                if (parser_pos >= input_length) {
+                    return ['', 'TK_EOF'];
+                }
+
+                c = input.charAt(parser_pos);
+                parser_pos += 1;
+            }
+
+            if (in_array(c, wordchar)) {
+                if (parser_pos < input_length) {
+                    while (in_array(input.charAt(parser_pos), wordchar)) {
+                        c += input.charAt(parser_pos);
+                        parser_pos += 1;
+                        if (parser_pos === input_length) {
+                            break;
+                        }
+                    }
+                }
+
+                // small and surprisingly unugly hack for 1E-10 representation
+                if (parser_pos !== input_length && c.match(/^[0-9]+[Ee]$/) && (input.charAt(parser_pos) === '-' || input.charAt(parser_pos) === '+')) {
+
+                    var sign = input.charAt(parser_pos);
+                    parser_pos += 1;
+
+                    var t = get_next_token();
+                    c += sign + t[0];
+                    return [c, 'TK_WORD'];
+                }
+
+                if (c === 'in') { // hack for 'in' operator
+                    return [c, 'TK_OPERATOR'];
+                }
+                return [c, 'TK_WORD'];
+            }
+
+            if (c === '(' || c === '[') {
+                return [c, 'TK_START_EXPR'];
+            }
+
+            if (c === ')' || c === ']') {
+                return [c, 'TK_END_EXPR'];
+            }
+
+            if (c === '{') {
+                return [c, 'TK_START_BLOCK'];
+            }
+
+            if (c === '}') {
+                return [c, 'TK_END_BLOCK'];
+            }
+
+            if (c === ';') {
+                return [c, 'TK_SEMICOLON'];
+            }
+
+            if (c === '/') {
+                var comment = '';
+                // peek for comment /* ... */
+                var inline_comment = true;
+                if (input.charAt(parser_pos) === '*') {
+                    parser_pos += 1;
+                    if (parser_pos < input_length) {
+                        while (parser_pos < input_length && !(input.charAt(parser_pos) === '*' && input.charAt(parser_pos + 1) && input.charAt(parser_pos + 1) === '/')) {
+                            c = input.charAt(parser_pos);
+                            comment += c;
+                            if (c === "\n" || c === "\r") {
+                                inline_comment = false;
+                            }
+                            parser_pos += 1;
+                            if (parser_pos >= input_length) {
+                                break;
+                            }
+                        }
+                    }
+                    parser_pos += 2;
+                    if (inline_comment && n_newlines === 0) {
+                        return ['/*' + comment + '*/', 'TK_INLINE_COMMENT'];
+                    } else {
+                        return ['/*' + comment + '*/', 'TK_BLOCK_COMMENT'];
+                    }
+                }
+                // peek for comment // ...
+                if (input.charAt(parser_pos) === '/') {
+                    comment = c;
+                    while (input.charAt(parser_pos) !== '\r' && input.charAt(parser_pos) !== '\n') {
+                        comment += input.charAt(parser_pos);
+                        parser_pos += 1;
+                        if (parser_pos >= input_length) {
+                            break;
+                        }
+                    }
+                    return [comment, 'TK_COMMENT'];
+                }
+
+            }
+
+
+            if (c === "'" || c === '"' || // string
+                (
+                    (c === '/') || // regexp
+                    (opt.e4x && c === "<" && input.slice(parser_pos - 1).match(/^<([-a-zA-Z:0-9_.]+|{[^{}]*}|!\[CDATA\[[\s\S]*?\]\])\s*([-a-zA-Z:0-9_.]+=('[^']*'|"[^"]*"|{[^{}]*})\s*)*\/?\s*>/)) // xml
+                ) && ( // regex and xml can only appear in specific locations during parsing
+                    (last_type === 'TK_WORD' && is_special_word(flags.last_text)) ||
+                    (last_type === 'TK_END_EXPR' && in_array(previous_flags.mode, [MODE.Conditional, MODE.ForInitializer])) ||
+                    (in_array(last_type, ['TK_COMMENT', 'TK_START_EXPR', 'TK_START_BLOCK',
+                        'TK_END_BLOCK', 'TK_OPERATOR', 'TK_EQUALS', 'TK_EOF', 'TK_SEMICOLON', 'TK_COMMA'
+                    ]))
+                )) {
+
+                var sep = c,
+                    esc = false,
+                    has_char_escapes = false;
+
+                resulting_string = c;
+
+                if (parser_pos < input_length) {
+                    if (sep === '/') {
+                        //
+                        // handle regexp
+                        //
+                        var in_char_class = false;
+                        while (esc || in_char_class || input.charAt(parser_pos) !== sep) {
+                            resulting_string += input.charAt(parser_pos);
+                            if (!esc) {
+                                esc = input.charAt(parser_pos) === '\\';
+                                if (input.charAt(parser_pos) === '[') {
+                                    in_char_class = true;
+                                } else if (input.charAt(parser_pos) === ']') {
+                                    in_char_class = false;
+                                }
+                            } else {
+                                esc = false;
+                            }
+                            parser_pos += 1;
+                            if (parser_pos >= input_length) {
+                                // incomplete string/rexp when end-of-file reached.
+                                // bail out with what had been received so far.
+                                return [resulting_string, 'TK_STRING'];
+                            }
+                        }
+                    } else if (opt.e4x && sep === '<') {
+                        //
+                        // handle e4x xml literals
+                        //
+                        var xmlRegExp = /<(\/?)([-a-zA-Z:0-9_.]+|{[^{}]*}|!\[CDATA\[[\s\S]*?\]\])\s*([-a-zA-Z:0-9_.]+=('[^']*'|"[^"]*"|{[^{}]*})\s*)*(\/?)\s*>/g;
+                        var xmlStr = input.slice(parser_pos - 1);
+                        var match = xmlRegExp.exec(xmlStr);
+                        if (match && match.index === 0) {
+                            var rootTag = match[2];
+                            var depth = 0;
+                            while (match) {
+                                var isEndTag = !! match[1];
+                                var tagName = match[2];
+                                var isSingletonTag = ( !! match[match.length - 1]) || (tagName.slice(0, 8) === "![CDATA[");
+                                if (tagName === rootTag && !isSingletonTag) {
+                                    if (isEndTag) {
+                                        --depth;
+                                    } else {
+                                        ++depth;
+                                    }
+                                }
+                                if (depth <= 0) {
+                                    break;
+                                }
+                                match = xmlRegExp.exec(xmlStr);
+                            }
+                            var xmlLength = match ? match.index + match[0].length : xmlStr.length;
+                            parser_pos += xmlLength - 1;
+                            return [xmlStr.slice(0, xmlLength), "TK_STRING"];
+                        }
+                    } else {
+                        //
+                        // handle string
+                        //
+                        while (esc || input.charAt(parser_pos) !== sep) {
+                            resulting_string += input.charAt(parser_pos);
+                            if (esc) {
+                                if (input.charAt(parser_pos) === 'x' || input.charAt(parser_pos) === 'u') {
+                                    has_char_escapes = true;
+                                }
+                                esc = false;
+                            } else {
+                                esc = input.charAt(parser_pos) === '\\';
+                            }
+                            parser_pos += 1;
+                            if (parser_pos >= input_length) {
+                                // incomplete string/rexp when end-of-file reached.
+                                // bail out with what had been received so far.
+                                return [resulting_string, 'TK_STRING'];
+                            }
+                        }
+
+                    }
+                }
+
+                parser_pos += 1;
+                resulting_string += sep;
+
+                if (has_char_escapes && opt.unescape_strings) {
+                    resulting_string = unescape_string(resulting_string);
+                }
+
+                if (sep === '/') {
+                    // regexps may have modifiers /regexp/MOD , so fetch those, too
+                    while (parser_pos < input_length && in_array(input.charAt(parser_pos), wordchar)) {
+                        resulting_string += input.charAt(parser_pos);
+                        parser_pos += 1;
+                    }
+                }
+                return [resulting_string, 'TK_STRING'];
+            }
+
+            if (c === '#') {
+
+
+                if (output_lines.length === 1 && output_lines[0].text.length === 0 &&
+                    input.charAt(parser_pos) === '!') {
+                    // shebang
+                    resulting_string = c;
+                    while (parser_pos < input_length && c !== '\n') {
+                        c = input.charAt(parser_pos);
+                        resulting_string += c;
+                        parser_pos += 1;
+                    }
+                    return [trim(resulting_string) + '\n', 'TK_UNKNOWN'];
+                }
+
+
+
+                // Spidermonkey-specific sharp variables for circular references
+                // https://developer.mozilla.org/En/Sharp_variables_in_JavaScript
+                // http://mxr.mozilla.org/mozilla-central/source/js/src/jsscan.cpp around line 1935
+                var sharp = '#';
+                if (parser_pos < input_length && in_array(input.charAt(parser_pos), digits)) {
+                    do {
+                        c = input.charAt(parser_pos);
+                        sharp += c;
+                        parser_pos += 1;
+                    } while (parser_pos < input_length && c !== '#' && c !== '=');
+                    if (c === '#') {
+                        //
+                    } else if (input.charAt(parser_pos) === '[' && input.charAt(parser_pos + 1) === ']') {
+                        sharp += '[]';
+                        parser_pos += 2;
+                    } else if (input.charAt(parser_pos) === '{' && input.charAt(parser_pos + 1) === '}') {
+                        sharp += '{}';
+                        parser_pos += 2;
+                    }
+                    return [sharp, 'TK_WORD'];
+                }
+            }
+
+            if (c === '<' && input.substring(parser_pos - 1, parser_pos + 3) === '<!--') {
+                parser_pos += 3;
+                c = '<!--';
+                while (input.charAt(parser_pos) !== '\n' && parser_pos < input_length) {
+                    c += input.charAt(parser_pos);
+                    parser_pos++;
+                }
+                flags.in_html_comment = true;
+                return [c, 'TK_COMMENT'];
+            }
+
+            if (c === '-' && flags.in_html_comment && input.substring(parser_pos - 1, parser_pos + 2) === '-->') {
+                flags.in_html_comment = false;
+                parser_pos += 2;
+                return ['-->', 'TK_COMMENT'];
+            }
+
+            if (c === '.') {
+                return [c, 'TK_DOT'];
+            }
+
+            if (in_array(c, punct)) {
+                while (parser_pos < input_length && in_array(c + input.charAt(parser_pos), punct)) {
+                    c += input.charAt(parser_pos);
+                    parser_pos += 1;
+                    if (parser_pos >= input_length) {
+                        break;
+                    }
+                }
+
+                if (c === ',') {
+                    return [c, 'TK_COMMA'];
+                } else if (c === '=') {
+                    return [c, 'TK_EQUALS'];
+                } else {
+                    return [c, 'TK_OPERATOR'];
+                }
+            }
+
+            return [c, 'TK_UNKNOWN'];
+        }
+
+        function handle_start_expr() {
+            if (start_of_statement()) {
+                // The conditional starts the statement if appropriate.
+            }
+
+            var next_mode = MODE.Expression;
+            if (token_text === '[') {
+
+                if (last_type === 'TK_WORD' || flags.last_text === ')') {
+                    // this is array index specifier, break immediately
+                    // a[x], fn()[x]
+                    if (in_array(flags.last_text, line_starters)) {
+                        output_space_before_token = true;
+                    }
+                    set_mode(next_mode);
+                    print_token();
+                    indent();
+                    if (opt.space_in_paren) {
+                        output_space_before_token = true;
+                    }
+                    return;
+                }
+
+                next_mode = MODE.ArrayLiteral;
+                if (is_array(flags.mode)) {
+                    if (flags.last_text === '[' ||
+                        (flags.last_text === ',' && (last_last_text === ']' || last_last_text === '}'))) {
+                        // ], [ goes to new line
+                        // }, [ goes to new line
+                        if (!opt.keep_array_indentation) {
+                            print_newline();
+                        }
+                    }
+                }
+
+            } else {
+                if (flags.last_text === 'for') {
+                    next_mode = MODE.ForInitializer;
+                } else if (in_array(flags.last_text, ['if', 'while'])) {
+                    next_mode = MODE.Conditional;
+                } else {
+                    // next_mode = MODE.Expression;
+                }
+            }
+
+            if (flags.last_text === ';' || last_type === 'TK_START_BLOCK') {
+                print_newline();
+            } else if (last_type === 'TK_END_EXPR' || last_type === 'TK_START_EXPR' || last_type === 'TK_END_BLOCK' || flags.last_text === '.') {
+                // TODO: Consider whether forcing this is required.  Review failing tests when removed.
+                allow_wrap_or_preserved_newline(input_wanted_newline);
+                output_wrapped = false;
+                // do nothing on (( and )( and ][ and ]( and .(
+            } else if (last_type !== 'TK_WORD' && last_type !== 'TK_OPERATOR') {
+                output_space_before_token = true;
+            } else if (flags.last_word === 'function' || flags.last_word === 'typeof') {
+                // function() vs function ()
+                if (opt.jslint_happy) {
+                    output_space_before_token = true;
+                }
+            } else if (in_array(flags.last_text, line_starters) || flags.last_text === 'catch') {
+                if (opt.space_before_conditional) {
+                    output_space_before_token = true;
+                }
+            }
+
+            // Support of this kind of newline preservation.
+            // a = (b &&
+            //     (c || d));
+            if (token_text === '(') {
+                if (last_type === 'TK_EQUALS' || last_type === 'TK_OPERATOR') {
+                    if (flags.mode !== MODE.ObjectLiteral) {
+                        allow_wrap_or_preserved_newline();
+                    }
+                }
+            }
+
+            set_mode(next_mode);
+            print_token();
+            if (opt.space_in_paren) {
+                output_space_before_token = true;
+            }
+
+            // In all cases, if we newline while inside an expression it should be indented.
+            indent();
+        }
+
+        function handle_end_expr() {
+            // statements inside expressions are not valid syntax, but...
+            // statements must all be closed when their container closes
+            while (flags.mode === MODE.Statement) {
+                restore_mode();
+            }
+
+            if (token_text === ']' && is_array(flags.mode) && flags.multiline_frame && !opt.keep_array_indentation) {
+                print_newline();
+            }
+
+            if (flags.multiline_frame) {
+                allow_wrap_or_preserved_newline();
+            }
+            if (opt.space_in_paren) {
+                output_space_before_token = true;
+            }
+            if (token_text === ']' && opt.keep_array_indentation) {
+                print_token();
+                restore_mode();
+            } else {
+                restore_mode();
+                print_token();
+            }
+            remove_redundant_indentation(previous_flags);
+
+            // do {} while () // no statement required after
+            if (flags.do_while && previous_flags.mode === MODE.Conditional) {
+                previous_flags.mode = MODE.Expression;
+                flags.do_block = false;
+                flags.do_while = false;
+
+            }
+        }
+
+        function handle_start_block() {
+            set_mode(MODE.BlockStatement);
+
+            var empty_braces = is_next('}');
+            var empty_anonymous_function = empty_braces && flags.last_word === 'function' &&
+                last_type === 'TK_END_EXPR';
+
+            if (opt.brace_style === "expand") {
+                if (last_type !== 'TK_OPERATOR' &&
+                    (empty_anonymous_function ||
+                        last_type === 'TK_EQUALS' ||
+                        (is_special_word(flags.last_text) && flags.last_text !== 'else'))) {
+                    output_space_before_token = true;
+                } else {
+                    print_newline();
+                }
+            } else { // collapse
+                if (last_type !== 'TK_OPERATOR' && last_type !== 'TK_START_EXPR') {
+                    if (last_type === 'TK_START_BLOCK') {
+                        print_newline();
+                    } else {
+                        output_space_before_token = true;
+                    }
+                } else {
+                    // if TK_OPERATOR or TK_START_EXPR
+                    if (is_array(previous_flags.mode) && flags.last_text === ',') {
+                        if (last_last_text === '}') {
+                            // }, { in array context
+                            output_space_before_token = true;
+                        } else {
+                            print_newline(); // [a, b, c, {
+                        }
+                    }
+                }
+            }
+            print_token();
+            indent();
+        }
+
+        function handle_end_block() {
+            // statements must all be closed when their container closes
+            while (flags.mode === MODE.Statement) {
+                restore_mode();
+            }
+            var empty_braces = last_type === 'TK_START_BLOCK';
+
+            if (opt.brace_style === "expand") {
+                if (!empty_braces) {
+                    print_newline();
+                }
+            } else {
+                // skip {}
+                if (!empty_braces) {
+                    if (is_array(flags.mode) && opt.keep_array_indentation) {
+                        // we REALLY need a newline here, but newliner would skip that
+                        opt.keep_array_indentation = false;
+                        print_newline();
+                        opt.keep_array_indentation = true;
+
+                    } else {
+                        print_newline();
+                    }
+                }
+            }
+            restore_mode();
+            print_token();
+        }
+
+        function handle_word() {
+            if (start_of_statement()) {
+                // The conditional starts the statement if appropriate.
+            } else if (input_wanted_newline && !is_expression(flags.mode) &&
+                (last_type !== 'TK_OPERATOR' || (flags.last_text === '--' || flags.last_text === '++')) &&
+                last_type !== 'TK_EQUALS' &&
+                (opt.preserve_newlines || flags.last_text !== 'var')) {
+
+                print_newline();
+            }
+
+            if (flags.do_block && !flags.do_while) {
+                if (token_text === 'while') {
+                    // do {} ## while ()
+                    output_space_before_token = true;
+                    print_token();
+                    output_space_before_token = true;
+                    flags.do_while = true;
+                    return;
+                } else {
+                    // do {} should always have while as the next word.
+                    // if we don't see the expected while, recover
+                    print_newline();
+                    flags.do_block = false;
+                }
+            }
+
+            // if may be followed by else, or not
+            // Bare/inline ifs are tricky
+            // Need to unwind the modes correctly: if (a) if (b) c(); else d(); else e();
+            if (flags.if_block) {
+                if (token_text !== 'else') {
+                    while (flags.mode === MODE.Statement) {
+                        restore_mode();
+                    }
+                    flags.if_block = false;
+                }
+            }
+
+            if (token_text === 'case' || (token_text === 'default' && flags.in_case_statement)) {
+                print_newline();
+                if (flags.case_body || opt.jslint_happy) {
+                    // switch cases following one another
+                    deindent();
+                    flags.case_body = false;
+                }
+                print_token();
+                flags.in_case = true;
+                flags.in_case_statement = true;
+                return;
+            }
+
+            if (token_text === 'function') {
+                if (flags.var_line && last_type !== 'TK_EQUALS') {
+                    flags.var_line_reindented = true;
+                }
+                if ((just_added_newline() || flags.last_text === ';' || flags.last_text === '}') &&
+                    flags.last_text !== '{' && !is_array(flags.mode)) {
+                    // make sure there is a nice clean space of at least one blank line
+                    // before a new function definition, except in arrays
+                    if (!just_added_blankline()) {
+                        print_newline();
+                        print_newline(true);
+                    }
+                }
+                if (last_type === 'TK_WORD') {
+                    if (flags.last_text === 'get' || flags.last_text === 'set' || flags.last_text === 'new' || flags.last_text === 'return') {
+                        output_space_before_token = true;
+                    } else {
+                        print_newline();
+                    }
+                } else if (last_type === 'TK_OPERATOR' || flags.last_text === '=') {
+                    // foo = function
+                    output_space_before_token = true;
+                } else if (is_expression(flags.mode)) {
+                    // (function
+                } else {
+                    print_newline();
+                }
+            }
+
+            if (last_type === 'TK_COMMA' || last_type === 'TK_START_EXPR' || last_type === 'TK_EQUALS' || last_type === 'TK_OPERATOR') {
+                if (flags.mode !== MODE.ObjectLiteral) {
+                    allow_wrap_or_preserved_newline();
+                }
+            }
+
+            if (token_text === 'function') {
+                print_token();
+                flags.last_word = token_text;
+                return;
+            }
+
+            prefix = 'NONE';
+
+            if (last_type === 'TK_END_BLOCK') {
+                if (!in_array(token_text, ['else', 'catch', 'finally'])) {
+                    prefix = 'NEWLINE';
+                } else {
+                    if (opt.brace_style === "expand" || opt.brace_style === "end-expand") {
+                        prefix = 'NEWLINE';
+                    } else {
+                        prefix = 'SPACE';
+                        output_space_before_token = true;
+                    }
+                }
+            } else if (last_type === 'TK_SEMICOLON' && flags.mode === MODE.BlockStatement) {
+                // TODO: Should this be for STATEMENT as well?
+                prefix = 'NEWLINE';
+            } else if (last_type === 'TK_SEMICOLON' && is_expression(flags.mode)) {
+                prefix = 'SPACE';
+            } else if (last_type === 'TK_STRING') {
+                prefix = 'NEWLINE';
+            } else if (last_type === 'TK_WORD') {
+                prefix = 'SPACE';
+            } else if (last_type === 'TK_START_BLOCK') {
+                prefix = 'NEWLINE';
+            } else if (last_type === 'TK_END_EXPR') {
+                output_space_before_token = true;
+                prefix = 'NEWLINE';
+            }
+
+            if (in_array(token_text, line_starters) && flags.last_text !== ')') {
+                if (flags.last_text === 'else') {
+                    prefix = 'SPACE';
+                } else {
+                    prefix = 'NEWLINE';
+                }
+
+            }
+
+            if (in_array(token_text, ['else', 'catch', 'finally'])) {
+                if (last_type !== 'TK_END_BLOCK' || opt.brace_style === "expand" || opt.brace_style === "end-expand") {
+                    print_newline();
+                } else {
+                    trim_output(true);
+                    var line = output_lines[output_lines.length - 1];
+                    // If we trimmed and there's something other than a close block before us
+                    // put a newline back in.  Handles '} // comment' scenario.
+                    if (line.text[line.text.length - 1] !== '}') {
+                        print_newline();
+                    }
+                    output_space_before_token = true;
+                }
+            } else if (prefix === 'NEWLINE') {
+                if (is_special_word(flags.last_text)) {
+                    // no newline between 'return nnn'
+                    output_space_before_token = true;
+                } else if (last_type !== 'TK_END_EXPR') {
+                    if ((last_type !== 'TK_START_EXPR' || token_text !== 'var') && flags.last_text !== ':') {
+                        // no need to force newline on 'var': for (var x = 0...)
+                        if (token_text === 'if' && flags.last_word === 'else' && flags.last_text !== '{') {
+                            // no newline for } else if {
+                            output_space_before_token = true;
+                        } else {
+                            flags.var_line = false;
+                            flags.var_line_reindented = false;
+                            print_newline();
+                        }
+                    }
+                } else if (in_array(token_text, line_starters) && flags.last_text !== ')') {
+                    flags.var_line = false;
+                    flags.var_line_reindented = false;
+                    print_newline();
+                }
+            } else if (is_array(flags.mode) && flags.last_text === ',' && last_last_text === '}') {
+                print_newline(); // }, in lists get a newline treatment
+            } else if (prefix === 'SPACE') {
+                output_space_before_token = true;
+            }
+            print_token();
+            flags.last_word = token_text;
+
+            if (token_text === 'var') {
+                flags.var_line = true;
+                flags.var_line_reindented = false;
+                flags.var_line_tainted = false;
+            }
+
+            if (token_text === 'do') {
+                flags.do_block = true;
+            }
+
+            if (token_text === 'if') {
+                flags.if_block = true;
+            }
+        }
+
+        function handle_semicolon() {
+            if (start_of_statement()) {
+                // The conditional starts the statement if appropriate.
+                // Semicolon can be the start (and end) of a statement
+                output_space_before_token = false;
+            }
+            while (flags.mode === MODE.Statement && !flags.if_block && !flags.do_block) {
+                restore_mode();
+            }
+            print_token();
+            flags.var_line = false;
+            flags.var_line_reindented = false;
+            if (flags.mode === MODE.ObjectLiteral) {
+                // if we're in OBJECT mode and see a semicolon, its invalid syntax
+                // recover back to treating this as a BLOCK
+                flags.mode = MODE.BlockStatement;
+            }
+        }
+
+        function handle_string() {
+            if (start_of_statement()) {
+                // The conditional starts the statement if appropriate.
+                // One difference - strings want at least a space before
+                output_space_before_token = true;
+            } else if (last_type === 'TK_WORD') {
+                output_space_before_token = true;
+            } else if (last_type === 'TK_COMMA' || last_type === 'TK_START_EXPR' || last_type === 'TK_EQUALS' || last_type === 'TK_OPERATOR') {
+                if (flags.mode !== MODE.ObjectLiteral) {
+                    allow_wrap_or_preserved_newline();
+                }
+            } else {
+                print_newline();
+            }
+            print_token();
+        }
+
+        function handle_equals() {
+            if (flags.var_line) {
+                // just got an '=' in a var-line, different formatting/line-breaking, etc will now be done
+                flags.var_line_tainted = true;
+            }
+            output_space_before_token = true;
+            print_token();
+            output_space_before_token = true;
+        }
+
+        function handle_comma() {
+            if (flags.var_line) {
+                if (is_expression(flags.mode) || last_type === 'TK_END_BLOCK') {
+                    // do not break on comma, for(var a = 1, b = 2)
+                    flags.var_line_tainted = false;
+                }
+
+                if (flags.var_line) {
+                    flags.var_line_reindented = true;
+                }
+
+                print_token();
+
+                if (flags.var_line_tainted) {
+                    flags.var_line_tainted = false;
+                    print_newline();
+                } else {
+                    output_space_before_token = true;
+                }
+                return;
+            }
+
+            if (last_type === 'TK_END_BLOCK' && flags.mode !== MODE.Expression) {
+                print_token();
+                if (flags.mode === MODE.ObjectLiteral && flags.last_text === '}') {
+                    print_newline();
+                } else {
+                    output_space_before_token = true;
+                }
+            } else {
+                if (flags.mode === MODE.ObjectLiteral) {
+                    print_token();
+                    print_newline();
+                } else {
+                    // EXPR or DO_BLOCK
+                    print_token();
+                    output_space_before_token = true;
+                }
+            }
+        }
+
+        function handle_operator() {
+            var space_before = true;
+            var space_after = true;
+            if (is_special_word(flags.last_text)) {
+                // "return" had a special handling in TK_WORD. Now we need to return the favor
+                output_space_before_token = true;
+                print_token();
+                return;
+            }
+
+            // hack for actionscript's import .*;
+            if (token_text === '*' && last_type === 'TK_DOT' && !last_last_text.match(/^\d+$/)) {
+                print_token();
+                return;
+            }
+
+            if (token_text === ':' && flags.in_case) {
+                flags.case_body = true;
+                indent();
+                print_token();
+                print_newline();
+                flags.in_case = false;
+                return;
+            }
+
+            if (token_text === '::') {
+                // no spaces around exotic namespacing syntax operator
+                print_token();
+                return;
+            }
+
+            // http://www.ecma-international.org/ecma-262/5.1/#sec-7.9.1
+            // if there is a newline between -- or ++ and anything else we should preserve it.
+            if (input_wanted_newline && (token_text === '--' || token_text === '++')) {
+                print_newline();
+            }
+
+            if (in_array(token_text, ['--', '++', '!']) || (in_array(token_text, ['-', '+']) && (in_array(last_type, ['TK_START_BLOCK', 'TK_START_EXPR', 'TK_EQUALS', 'TK_OPERATOR']) || in_array(flags.last_text, line_starters) || flags.last_text === ','))) {
+                // unary operators (and binary +/- pretending to be unary) special cases
+
+                space_before = false;
+                space_after = false;
+
+                if (flags.last_text === ';' && is_expression(flags.mode)) {
+                    // for (;; ++i)
+                    //        ^^^
+                    space_before = true;
+                }
+
+                if (last_type === 'TK_WORD' && in_array(flags.last_text, line_starters)) {
+                    space_before = true;
+                }
+
+                if ((flags.mode === MODE.BlockStatement || flags.mode === MODE.Statement) && (flags.last_text === '{' || flags.last_text === ';')) {
+                    // { foo; --i }
+                    // foo(); --bar;
+                    print_newline();
+                }
+            } else if (token_text === ':') {
+                if (flags.ternary_depth === 0) {
+                    if (flags.mode === MODE.BlockStatement) {
+                        flags.mode = MODE.ObjectLiteral;
+                    }
+                    space_before = false;
+                } else {
+                    flags.ternary_depth -= 1;
+                }
+            } else if (token_text === '?') {
+                flags.ternary_depth += 1;
+            }
+            output_space_before_token = output_space_before_token || space_before;
+            print_token();
+            output_space_before_token = space_after;
+        }
+
+        function handle_block_comment() {
+            var lines = split_newlines(token_text);
+            var j; // iterator for this case
+            var javadoc = false;
+
+            // block comment starts with a new line
+            print_newline(false, true);
+            if (lines.length > 1) {
+                if (all_lines_start_with(lines.slice(1), '*')) {
+                    javadoc = true;
+                }
+            }
+
+            // first line always indented
+            print_token(lines[0]);
+            for (j = 1; j < lines.length; j++) {
+                print_newline(false, true);
+                if (javadoc) {
+                    // javadoc: reformat and re-indent
+                    print_token(' ' + trim(lines[j]));
+                } else {
+                    // normal comments output raw
+                    output_lines[output_lines.length - 1].text.push(lines[j]);
+                }
+            }
+
+            // for comments of more than one line, make sure there's a new line after
+            print_newline(false, true);
+        }
+
+        function handle_inline_comment() {
+            output_space_before_token = true;
+            print_token();
+            output_space_before_token = true;
+        }
+
+        function handle_comment() {
+            if (input_wanted_newline) {
+                print_newline(false, true);
+            } else {
+                trim_output(true);
+            }
+
+            output_space_before_token = true;
+            print_token();
+            print_newline(false, true);
+        }
+
+        function handle_dot() {
+            if (is_special_word(flags.last_text)) {
+                output_space_before_token = true;
+            } else {
+                // allow preserved newlines before dots in general
+                // force newlines on dots after close paren when break_chained - for bar().baz()
+                allow_wrap_or_preserved_newline(flags.last_text === ')' && opt.break_chained_methods);
+            }
+
+            print_token();
+        }
+
+        function handle_unknown() {
+            print_token();
+
+            if (token_text[token_text.length - 1] === '\n') {
+                print_newline();
+            }
+        }
+    }
+
+
+    if (true) {
+        // Add support for require.js
+        if (false) {} else {
+            // if is AMD ( https://github.com/amdjs/amdjs-api/wiki/AMD#defineamd-property- )
+            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_RESULT__ = (function() {
+                return js_beautify;
+            }).apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+        }
+
+    } else {}
+
+}());
+
+
+/***/ }),
+
+/***/ "./node_modules/prettify/lib/defaults.js":
+/*!***********************************************!*\
+  !*** ./node_modules/prettify/lib/defaults.js ***!
+  \***********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/**
+ * {{prettify}} by Jon Schlinkert
+ * http://github.com/helpers/prettify
+ *
+ * Copyright (c) 2013 Jon Schlinkert
+ * MIT License
+ */
+
+
+
+exports.html = {
+  indent: 2,
+  condense: true,
+  padcomments: true,
+  indent_char: ' ',
+  indent_size: 2,
+  indent_inner_html: true,
+  unformatted: ['code', 'pre', 'em', 'strong']
+};
+
+
+exports.css = {
+  indent_size: 2,
+  indent_char: ' '
+};
+
+
+exports.js = {
+  indent_size: 2,
+  indent_char: ' ',
+  indent_level: 0,
+  indent_with_tabs: false,
+  preserve_newlines: true,
+  max_preserve_newlines: 10,
+  jslint_happy: true,
+  brace_style: 'collapse',
+  keep_array_indentation: false,
+  keep_function_indentation: false,
+  space_before_conditional: true,
+  break_chained_methods: false,
+  eval_code: false,
+  unescape_strings: false,
+  wrap_line_length: 0
+};
+
+
+
+/***/ }),
+
+/***/ "./node_modules/prettify/node_modules/lodash/dist/lodash.js":
+/*!******************************************************************!*\
+  !*** ./node_modules/prettify/node_modules/lodash/dist/lodash.js ***!
+  \******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+/* WEBPACK VAR INJECTION */(function(module, global) {var __WEBPACK_AMD_DEFINE_RESULT__;/**
+ * @license
+ * Lo-Dash 1.3.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modern -o ./dist/lodash.js`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.4.4 <http://underscorejs.org/>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud Inc.
+ * Available under MIT license <http://lodash.com/license>
+ */
+;(function(window) {
+
+  /** Used as a safe reference for `undefined` in pre ES5 environments */
+  var undefined;
+
+  /** Used to pool arrays and objects used internally */
+  var arrayPool = [],
+      objectPool = [];
+
+  /** Used to generate unique IDs */
+  var idCounter = 0;
+
+  /** Used internally to indicate various things */
+  var indicatorObject = {};
+
+  /** Used to prefix keys to avoid issues with `__proto__` and properties on `Object.prototype` */
+  var keyPrefix = +new Date + '';
+
+  /** Used as the size when optimizations are enabled for large arrays */
+  var largeArraySize = 75;
+
+  /** Used as the max size of the `arrayPool` and `objectPool` */
+  var maxPoolSize = 40;
+
+  /** Used to match empty string literals in compiled template source */
+  var reEmptyStringLeading = /\b__p \+= '';/g,
+      reEmptyStringMiddle = /\b(__p \+=) '' \+/g,
+      reEmptyStringTrailing = /(__e\(.*?\)|\b__t\)) \+\n'';/g;
+
+  /** Used to match HTML entities */
+  var reEscapedHtml = /&(?:amp|lt|gt|quot|#39);/g;
+
+  /**
+   * Used to match ES6 template delimiters
+   * http://people.mozilla.org/~jorendorff/es6-draft.html#sec-7.8.6
+   */
+  var reEsTemplate = /\$\{([^\\}]*(?:\\.[^\\}]*)*)\}/g;
+
+  /** Used to match regexp flags from their coerced string values */
+  var reFlags = /\w*$/;
+
+  /** Used to match "interpolate" template delimiters */
+  var reInterpolate = /<%=([\s\S]+?)%>/g;
+
+  /** Used to detect functions containing a `this` reference */
+  var reThis = (reThis = /\bthis\b/) && reThis.test(runInContext) && reThis;
+
+  /** Used to detect and test whitespace */
+  var whitespace = (
+    // whitespace
+    ' \t\x0B\f\xA0\ufeff' +
+
+    // line terminators
+    '\n\r\u2028\u2029' +
+
+    // unicode category "Zs" space separators
+    '\u1680\u180e\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000'
+  );
+
+  /** Used to match leading whitespace and zeros to be removed */
+  var reLeadingSpacesAndZeros = RegExp('^[' + whitespace + ']*0+(?=.$)');
+
+  /** Used to ensure capturing order of template delimiters */
+  var reNoMatch = /($^)/;
+
+  /** Used to match HTML characters */
+  var reUnescapedHtml = /[&<>"']/g;
+
+  /** Used to match unescaped characters in compiled string literals */
+  var reUnescapedString = /['\n\r\t\u2028\u2029\\]/g;
+
+  /** Used to assign default `context` object properties */
+  var contextProps = [
+    'Array', 'Boolean', 'Date', 'Function', 'Math', 'Number', 'Object',
+    'RegExp', 'String', '_', 'attachEvent', 'clearTimeout', 'isFinite', 'isNaN',
+    'parseInt', 'setImmediate', 'setTimeout'
+  ];
+
+  /** Used to make template sourceURLs easier to identify */
+  var templateCounter = 0;
+
+  /** `Object#toString` result shortcuts */
+  var argsClass = '[object Arguments]',
+      arrayClass = '[object Array]',
+      boolClass = '[object Boolean]',
+      dateClass = '[object Date]',
+      errorClass = '[object Error]',
+      funcClass = '[object Function]',
+      numberClass = '[object Number]',
+      objectClass = '[object Object]',
+      regexpClass = '[object RegExp]',
+      stringClass = '[object String]';
+
+  /** Used to identify object classifications that `_.clone` supports */
+  var cloneableClasses = {};
+  cloneableClasses[funcClass] = false;
+  cloneableClasses[argsClass] = cloneableClasses[arrayClass] =
+  cloneableClasses[boolClass] = cloneableClasses[dateClass] =
+  cloneableClasses[numberClass] = cloneableClasses[objectClass] =
+  cloneableClasses[regexpClass] = cloneableClasses[stringClass] = true;
+
+  /** Used to determine if values are of the language type Object */
+  var objectTypes = {
+    'boolean': false,
+    'function': true,
+    'object': true,
+    'number': false,
+    'string': false,
+    'undefined': false
+  };
+
+  /** Used to escape characters for inclusion in compiled string literals */
+  var stringEscapes = {
+    '\\': '\\',
+    "'": "'",
+    '\n': 'n',
+    '\r': 'r',
+    '\t': 't',
+    '\u2028': 'u2028',
+    '\u2029': 'u2029'
+  };
+
+  /** Detect free variable `exports` */
+  var freeExports = objectTypes[typeof exports] && exports;
+
+  /** Detect free variable `module` */
+  var freeModule = objectTypes[typeof module] && module && module.exports == freeExports && module;
+
+  /** Detect free variable `global`, from Node.js or Browserified code, and use it as `window` */
+  var freeGlobal = objectTypes[typeof global] && global;
+  if (freeGlobal && (freeGlobal.global === freeGlobal || freeGlobal.window === freeGlobal)) {
+    window = freeGlobal;
+  }
+
+  /*--------------------------------------------------------------------------*/
+
+  /**
+   * A basic implementation of `_.indexOf` without support for binary searches
+   * or `fromIndex` constraints.
+   *
+   * @private
+   * @param {Array} array The array to search.
+   * @param {Mixed} value The value to search for.
+   * @param {Number} [fromIndex=0] The index to search from.
+   * @returns {Number} Returns the index of the matched value or `-1`.
+   */
+  function basicIndexOf(array, value, fromIndex) {
+    var index = (fromIndex || 0) - 1,
+        length = array.length;
+
+    while (++index < length) {
+      if (array[index] === value) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * An implementation of `_.contains` for cache objects that mimics the return
+   * signature of `_.indexOf` by returning `0` if the value is found, else `-1`.
+   *
+   * @private
+   * @param {Object} cache The cache object to inspect.
+   * @param {Mixed} value The value to search for.
+   * @returns {Number} Returns `0` if `value` is found, else `-1`.
+   */
+  function cacheIndexOf(cache, value) {
+    var type = typeof value;
+    cache = cache.cache;
+
+    if (type == 'boolean' || value == null) {
+      return cache[value];
+    }
+    if (type != 'number' && type != 'string') {
+      type = 'object';
+    }
+    var key = type == 'number' ? value : keyPrefix + value;
+    cache = cache[type] || (cache[type] = {});
+
+    return type == 'object'
+      ? (cache[key] && basicIndexOf(cache[key], value) > -1 ? 0 : -1)
+      : (cache[key] ? 0 : -1);
+  }
+
+  /**
+   * Adds a given `value` to the corresponding cache object.
+   *
+   * @private
+   * @param {Mixed} value The value to add to the cache.
+   */
+  function cachePush(value) {
+    var cache = this.cache,
+        type = typeof value;
+
+    if (type == 'boolean' || value == null) {
+      cache[value] = true;
+    } else {
+      if (type != 'number' && type != 'string') {
+        type = 'object';
+      }
+      var key = type == 'number' ? value : keyPrefix + value,
+          typeCache = cache[type] || (cache[type] = {});
+
+      if (type == 'object') {
+        if ((typeCache[key] || (typeCache[key] = [])).push(value) == this.array.length) {
+          cache[type] = false;
+        }
+      } else {
+        typeCache[key] = true;
+      }
+    }
+  }
+
+  /**
+   * Used by `_.max` and `_.min` as the default `callback` when a given
+   * `collection` is a string value.
+   *
+   * @private
+   * @param {String} value The character to inspect.
+   * @returns {Number} Returns the code unit of given character.
+   */
+  function charAtCallback(value) {
+    return value.charCodeAt(0);
+  }
+
+  /**
+   * Used by `sortBy` to compare transformed `collection` values, stable sorting
+   * them in ascending order.
+   *
+   * @private
+   * @param {Object} a The object to compare to `b`.
+   * @param {Object} b The object to compare to `a`.
+   * @returns {Number} Returns the sort order indicator of `1` or `-1`.
+   */
+  function compareAscending(a, b) {
+    var ai = a.index,
+        bi = b.index;
+
+    a = a.criteria;
+    b = b.criteria;
+
+    // ensure a stable sort in V8 and other engines
+    // http://code.google.com/p/v8/issues/detail?id=90
+    if (a !== b) {
+      if (a > b || typeof a == 'undefined') {
+        return 1;
+      }
+      if (a < b || typeof b == 'undefined') {
+        return -1;
+      }
+    }
+    return ai < bi ? -1 : 1;
+  }
+
+  /**
+   * Creates a cache object to optimize linear searches of large arrays.
+   *
+   * @private
+   * @param {Array} [array=[]] The array to search.
+   * @returns {Null|Object} Returns the cache object or `null` if caching should not be used.
+   */
+  function createCache(array) {
+    var index = -1,
+        length = array.length;
+
+    var cache = getObject();
+    cache['false'] = cache['null'] = cache['true'] = cache['undefined'] = false;
+
+    var result = getObject();
+    result.array = array;
+    result.cache = cache;
+    result.push = cachePush;
+
+    while (++index < length) {
+      result.push(array[index]);
+    }
+    return cache.object === false
+      ? (releaseObject(result), null)
+      : result;
+  }
+
+  /**
+   * Used by `template` to escape characters for inclusion in compiled
+   * string literals.
+   *
+   * @private
+   * @param {String} match The matched character to escape.
+   * @returns {String} Returns the escaped character.
+   */
+  function escapeStringChar(match) {
+    return '\\' + stringEscapes[match];
+  }
+
+  /**
+   * Gets an array from the array pool or creates a new one if the pool is empty.
+   *
+   * @private
+   * @returns {Array} The array from the pool.
+   */
+  function getArray() {
+    return arrayPool.pop() || [];
+  }
+
+  /**
+   * Gets an object from the object pool or creates a new one if the pool is empty.
+   *
+   * @private
+   * @returns {Object} The object from the pool.
+   */
+  function getObject() {
+    return objectPool.pop() || {
+      'array': null,
+      'cache': null,
+      'criteria': null,
+      'false': false,
+      'index': 0,
+      'leading': false,
+      'maxWait': 0,
+      'null': false,
+      'number': null,
+      'object': null,
+      'push': null,
+      'string': null,
+      'trailing': false,
+      'true': false,
+      'undefined': false,
+      'value': null
+    };
+  }
+
+  /**
+   * A no-operation function.
+   *
+   * @private
+   */
+  function noop() {
+    // no operation performed
+  }
+
+  /**
+   * Releases the given `array` back to the array pool.
+   *
+   * @private
+   * @param {Array} [array] The array to release.
+   */
+  function releaseArray(array) {
+    array.length = 0;
+    if (arrayPool.length < maxPoolSize) {
+      arrayPool.push(array);
+    }
+  }
+
+  /**
+   * Releases the given `object` back to the object pool.
+   *
+   * @private
+   * @param {Object} [object] The object to release.
+   */
+  function releaseObject(object) {
+    var cache = object.cache;
+    if (cache) {
+      releaseObject(cache);
+    }
+    object.array = object.cache = object.criteria = object.object = object.number = object.string = object.value = null;
+    if (objectPool.length < maxPoolSize) {
+      objectPool.push(object);
+    }
+  }
+
+  /**
+   * Slices the `collection` from the `start` index up to, but not including,
+   * the `end` index.
+   *
+   * Note: This function is used, instead of `Array#slice`, to support node lists
+   * in IE < 9 and to ensure dense arrays are returned.
+   *
+   * @private
+   * @param {Array|Object|String} collection The collection to slice.
+   * @param {Number} start The start index.
+   * @param {Number} end The end index.
+   * @returns {Array} Returns the new array.
+   */
+  function slice(array, start, end) {
+    start || (start = 0);
+    if (typeof end == 'undefined') {
+      end = array ? array.length : 0;
+    }
+    var index = -1,
+        length = end - start || 0,
+        result = Array(length < 0 ? 0 : length);
+
+    while (++index < length) {
+      result[index] = array[start + index];
+    }
+    return result;
+  }
+
+  /*--------------------------------------------------------------------------*/
+
+  /**
+   * Create a new `lodash` function using the given `context` object.
+   *
+   * @static
+   * @memberOf _
+   * @category Utilities
+   * @param {Object} [context=window] The context object.
+   * @returns {Function} Returns the `lodash` function.
+   */
+  function runInContext(context) {
+    // Avoid issues with some ES3 environments that attempt to use values, named
+    // after built-in constructors like `Object`, for the creation of literals.
+    // ES5 clears this up by stating that literals must use built-in constructors.
+    // See http://es5.github.com/#x11.1.5.
+    context = context ? _.defaults(window.Object(), context, _.pick(window, contextProps)) : window;
+
+    /** Native constructor references */
+    var Array = context.Array,
+        Boolean = context.Boolean,
+        Date = context.Date,
+        Function = context.Function,
+        Math = context.Math,
+        Number = context.Number,
+        Object = context.Object,
+        RegExp = context.RegExp,
+        String = context.String,
+        TypeError = context.TypeError;
+
+    /**
+     * Used for `Array` method references.
+     *
+     * Normally `Array.prototype` would suffice, however, using an array literal
+     * avoids issues in Narwhal.
+     */
+    var arrayRef = [];
+
+    /** Used for native method references */
+    var objectProto = Object.prototype,
+        stringProto = String.prototype;
+
+    /** Used to restore the original `_` reference in `noConflict` */
+    var oldDash = context._;
+
+    /** Used to detect if a method is native */
+    var reNative = RegExp('^' +
+      String(objectProto.valueOf)
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/valueOf|for [^\]]+/g, '.+?') + '$'
+    );
+
+    /** Native method shortcuts */
+    var ceil = Math.ceil,
+        clearTimeout = context.clearTimeout,
+        concat = arrayRef.concat,
+        floor = Math.floor,
+        fnToString = Function.prototype.toString,
+        getPrototypeOf = reNative.test(getPrototypeOf = Object.getPrototypeOf) && getPrototypeOf,
+        hasOwnProperty = objectProto.hasOwnProperty,
+        push = arrayRef.push,
+        propertyIsEnumerable = objectProto.propertyIsEnumerable,
+        setImmediate = context.setImmediate,
+        setTimeout = context.setTimeout,
+        toString = objectProto.toString;
+
+    /* Native method shortcuts for methods with the same name as other `lodash` methods */
+    var nativeBind = reNative.test(nativeBind = toString.bind) && nativeBind,
+        nativeCreate = reNative.test(nativeCreate =  Object.create) && nativeCreate,
+        nativeIsArray = reNative.test(nativeIsArray = Array.isArray) && nativeIsArray,
+        nativeIsFinite = context.isFinite,
+        nativeIsNaN = context.isNaN,
+        nativeKeys = reNative.test(nativeKeys = Object.keys) && nativeKeys,
+        nativeMax = Math.max,
+        nativeMin = Math.min,
+        nativeParseInt = context.parseInt,
+        nativeRandom = Math.random,
+        nativeSlice = arrayRef.slice;
+
+    /** Detect various environments */
+    var isIeOpera = reNative.test(context.attachEvent),
+        isV8 = nativeBind && !/\n|true/.test(nativeBind + isIeOpera);
+
+    /** Used to lookup a built-in constructor by [[Class]] */
+    var ctorByClass = {};
+    ctorByClass[arrayClass] = Array;
+    ctorByClass[boolClass] = Boolean;
+    ctorByClass[dateClass] = Date;
+    ctorByClass[funcClass] = Function;
+    ctorByClass[objectClass] = Object;
+    ctorByClass[numberClass] = Number;
+    ctorByClass[regexpClass] = RegExp;
+    ctorByClass[stringClass] = String;
+
+    /*--------------------------------------------------------------------------*/
+
+    /**
+     * Creates a `lodash` object, which wraps the given `value`, to enable method
+     * chaining.
+     *
+     * In addition to Lo-Dash methods, wrappers also have the following `Array` methods:
+     * `concat`, `join`, `pop`, `push`, `reverse`, `shift`, `slice`, `sort`, `splice`,
+     * and `unshift`
+     *
+     * Chaining is supported in custom builds as long as the `value` method is
+     * implicitly or explicitly included in the build.
+     *
+     * The chainable wrapper functions are:
+     * `after`, `assign`, `bind`, `bindAll`, `bindKey`, `chain`, `compact`,
+     * `compose`, `concat`, `countBy`, `createCallback`, `debounce`, `defaults`,
+     * `defer`, `delay`, `difference`, `filter`, `flatten`, `forEach`, `forIn`,
+     * `forOwn`, `functions`, `groupBy`, `initial`, `intersection`, `invert`,
+     * `invoke`, `keys`, `map`, `max`, `memoize`, `merge`, `min`, `object`, `omit`,
+     * `once`, `pairs`, `partial`, `partialRight`, `pick`, `pluck`, `push`, `range`,
+     * `reject`, `rest`, `reverse`, `shuffle`, `slice`, `sort`, `sortBy`, `splice`,
+     * `tap`, `throttle`, `times`, `toArray`, `transform`, `union`, `uniq`, `unshift`,
+     * `unzip`, `values`, `where`, `without`, `wrap`, and `zip`
+     *
+     * The non-chainable wrapper functions are:
+     * `clone`, `cloneDeep`, `contains`, `escape`, `every`, `find`, `has`,
+     * `identity`, `indexOf`, `isArguments`, `isArray`, `isBoolean`, `isDate`,
+     * `isElement`, `isEmpty`, `isEqual`, `isFinite`, `isFunction`, `isNaN`,
+     * `isNull`, `isNumber`, `isObject`, `isPlainObject`, `isRegExp`, `isString`,
+     * `isUndefined`, `join`, `lastIndexOf`, `mixin`, `noConflict`, `parseInt`,
+     * `pop`, `random`, `reduce`, `reduceRight`, `result`, `shift`, `size`, `some`,
+     * `sortedIndex`, `runInContext`, `template`, `unescape`, `uniqueId`, and `value`
+     *
+     * The wrapper functions `first` and `last` return wrapped values when `n` is
+     * passed, otherwise they return unwrapped values.
+     *
+     * @name _
+     * @constructor
+     * @alias chain
+     * @category Chaining
+     * @param {Mixed} value The value to wrap in a `lodash` instance.
+     * @returns {Object} Returns a `lodash` instance.
+     * @example
+     *
+     * var wrapped = _([1, 2, 3]);
+     *
+     * // returns an unwrapped value
+     * wrapped.reduce(function(sum, num) {
+     *   return sum + num;
+     * });
+     * // => 6
+     *
+     * // returns a wrapped value
+     * var squares = wrapped.map(function(num) {
+     *   return num * num;
+     * });
+     *
+     * _.isArray(squares);
+     * // => false
+     *
+     * _.isArray(squares.value());
+     * // => true
+     */
+    function lodash(value) {
+      // don't wrap if already wrapped, even if wrapped by a different `lodash` constructor
+      return (value && typeof value == 'object' && !isArray(value) && hasOwnProperty.call(value, '__wrapped__'))
+       ? value
+       : new lodashWrapper(value);
+    }
+
+    /**
+     * A fast path for creating `lodash` wrapper objects.
+     *
+     * @private
+     * @param {Mixed} value The value to wrap in a `lodash` instance.
+     * @returns {Object} Returns a `lodash` instance.
+     */
+    function lodashWrapper(value) {
+      this.__wrapped__ = value;
+    }
+    // ensure `new lodashWrapper` is an instance of `lodash`
+    lodashWrapper.prototype = lodash.prototype;
+
+    /**
+     * An object used to flag environments features.
+     *
+     * @static
+     * @memberOf _
+     * @type Object
+     */
+    var support = lodash.support = {};
+
+    /**
+     * Detect if `Function#bind` exists and is inferred to be fast (all but V8).
+     *
+     * @memberOf _.support
+     * @type Boolean
+     */
+    support.fastBind = nativeBind && !isV8;
+
+    /**
+     * By default, the template delimiters used by Lo-Dash are similar to those in
+     * embedded Ruby (ERB). Change the following template settings to use alternative
+     * delimiters.
+     *
+     * @static
+     * @memberOf _
+     * @type Object
+     */
+    lodash.templateSettings = {
+
+      /**
+       * Used to detect `data` property values to be HTML-escaped.
+       *
+       * @memberOf _.templateSettings
+       * @type RegExp
+       */
+      'escape': /<%-([\s\S]+?)%>/g,
+
+      /**
+       * Used to detect code to be evaluated.
+       *
+       * @memberOf _.templateSettings
+       * @type RegExp
+       */
+      'evaluate': /<%([\s\S]+?)%>/g,
+
+      /**
+       * Used to detect `data` property values to inject.
+       *
+       * @memberOf _.templateSettings
+       * @type RegExp
+       */
+      'interpolate': reInterpolate,
+
+      /**
+       * Used to reference the data object in the template text.
+       *
+       * @memberOf _.templateSettings
+       * @type String
+       */
+      'variable': '',
+
+      /**
+       * Used to import variables into the compiled template.
+       *
+       * @memberOf _.templateSettings
+       * @type Object
+       */
+      'imports': {
+
+        /**
+         * A reference to the `lodash` function.
+         *
+         * @memberOf _.templateSettings.imports
+         * @type Function
+         */
+        '_': lodash
+      }
+    };
+
+    /*--------------------------------------------------------------------------*/
+
+    /**
+     * Creates a function that, when called, invokes `func` with the `this` binding
+     * of `thisArg` and prepends any `partialArgs` to the arguments passed to the
+     * bound function.
+     *
+     * @private
+     * @param {Function|String} func The function to bind or the method name.
+     * @param {Mixed} [thisArg] The `this` binding of `func`.
+     * @param {Array} partialArgs An array of arguments to be partially applied.
+     * @param {Object} [idicator] Used to indicate binding by key or partially
+     *  applying arguments from the right.
+     * @returns {Function} Returns the new bound function.
+     */
+    function createBound(func, thisArg, partialArgs, indicator) {
+      var isFunc = isFunction(func),
+          isPartial = !partialArgs,
+          key = thisArg;
+
+      // juggle arguments
+      if (isPartial) {
+        var rightIndicator = indicator;
+        partialArgs = thisArg;
+      }
+      else if (!isFunc) {
+        if (!indicator) {
+          throw new TypeError;
+        }
+        thisArg = func;
+      }
+
+      function bound() {
+        // `Function#bind` spec
+        // http://es5.github.com/#x15.3.4.5
+        var args = arguments,
+            thisBinding = isPartial ? this : thisArg;
+
+        if (!isFunc) {
+          func = thisArg[key];
+        }
+        if (partialArgs.length) {
+          args = args.length
+            ? (args = nativeSlice.call(args), rightIndicator ? args.concat(partialArgs) : partialArgs.concat(args))
+            : partialArgs;
+        }
+        if (this instanceof bound) {
+          // ensure `new bound` is an instance of `func`
+          thisBinding = createObject(func.prototype);
+
+          // mimic the constructor's `return` behavior
+          // http://es5.github.com/#x13.2.2
+          var result = func.apply(thisBinding, args);
+          return isObject(result) ? result : thisBinding;
+        }
+        return func.apply(thisBinding, args);
+      }
+      return bound;
+    }
+
+    /**
+     * Creates a new object with the specified `prototype`.
+     *
+     * @private
+     * @param {Object} prototype The prototype object.
+     * @returns {Object} Returns the new object.
+     */
+    function createObject(prototype) {
+      return isObject(prototype) ? nativeCreate(prototype) : {};
+    }
+
+    /**
+     * Used by `escape` to convert characters to HTML entities.
+     *
+     * @private
+     * @param {String} match The matched character to escape.
+     * @returns {String} Returns the escaped character.
+     */
+    function escapeHtmlChar(match) {
+      return htmlEscapes[match];
+    }
+
+    /**
+     * Gets the appropriate "indexOf" function. If the `_.indexOf` method is
+     * customized, this method returns the custom method, otherwise it returns
+     * the `basicIndexOf` function.
+     *
+     * @private
+     * @returns {Function} Returns the "indexOf" function.
+     */
+    function getIndexOf(array, value, fromIndex) {
+      var result = (result = lodash.indexOf) === indexOf ? basicIndexOf : result;
+      return result;
+    }
+
+    /**
+     * Creates a function that juggles arguments, allowing argument overloading
+     * for `_.flatten` and `_.uniq`, before passing them to the given `func`.
+     *
+     * @private
+     * @param {Function} func The function to wrap.
+     * @returns {Function} Returns the new function.
+     */
+    function overloadWrapper(func) {
+      return function(array, flag, callback, thisArg) {
+        // juggle arguments
+        if (typeof flag != 'boolean' && flag != null) {
+          thisArg = callback;
+          callback = !(thisArg && thisArg[flag] === array) ? flag : undefined;
+          flag = false;
+        }
+        if (callback != null) {
+          callback = lodash.createCallback(callback, thisArg);
+        }
+        return func(array, flag, callback, thisArg);
+      };
+    }
+
+    /**
+     * A fallback implementation of `isPlainObject` which checks if a given `value`
+     * is an object created by the `Object` constructor, assuming objects created
+     * by the `Object` constructor have no inherited enumerable properties and that
+     * there are no `Object.prototype` extensions.
+     *
+     * @private
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if `value` is a plain object, else `false`.
+     */
+    function shimIsPlainObject(value) {
+      var ctor,
+          result;
+
+      // avoid non Object objects, `arguments` objects, and DOM elements
+      if (!(value && toString.call(value) == objectClass) ||
+          (ctor = value.constructor, isFunction(ctor) && !(ctor instanceof ctor))) {
+        return false;
+      }
+      // In most environments an object's own properties are iterated before
+      // its inherited properties. If the last iterated property is an object's
+      // own property then there are no inherited enumerable properties.
+      forIn(value, function(value, key) {
+        result = key;
+      });
+      return result === undefined || hasOwnProperty.call(value, result);
+    }
+
+    /**
+     * Used by `unescape` to convert HTML entities to characters.
+     *
+     * @private
+     * @param {String} match The matched character to unescape.
+     * @returns {String} Returns the unescaped character.
+     */
+    function unescapeHtmlChar(match) {
+      return htmlUnescapes[match];
+    }
+
+    /*--------------------------------------------------------------------------*/
+
+    /**
+     * Checks if `value` is an `arguments` object.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is an `arguments` object, else `false`.
+     * @example
+     *
+     * (function() { return _.isArguments(arguments); })(1, 2, 3);
+     * // => true
+     *
+     * _.isArguments([1, 2, 3]);
+     * // => false
+     */
+    function isArguments(value) {
+      return toString.call(value) == argsClass;
+    }
+
+    /**
+     * Checks if `value` is an array.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is an array, else `false`.
+     * @example
+     *
+     * (function() { return _.isArray(arguments); })();
+     * // => false
+     *
+     * _.isArray([1, 2, 3]);
+     * // => true
+     */
+    var isArray = nativeIsArray;
+
+    /**
+     * A fallback implementation of `Object.keys` which produces an array of the
+     * given object's own enumerable property names.
+     *
+     * @private
+     * @type Function
+     * @param {Object} object The object to inspect.
+     * @returns {Array} Returns a new array of property names.
+     */
+    var shimKeys = function (object) {
+      var index, iterable = object, result = [];
+      if (!iterable) return result;
+      if (!(objectTypes[typeof object])) return result;    
+        for (index in iterable) {
+          if (hasOwnProperty.call(iterable, index)) {
+            result.push(index);    
+          }
+        }    
+      return result
+    };
+
+    /**
+     * Creates an array composed of the own enumerable property names of `object`.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Object} object The object to inspect.
+     * @returns {Array} Returns a new array of property names.
+     * @example
+     *
+     * _.keys({ 'one': 1, 'two': 2, 'three': 3 });
+     * // => ['one', 'two', 'three'] (order is not guaranteed)
+     */
+    var keys = !nativeKeys ? shimKeys : function(object) {
+      if (!isObject(object)) {
+        return [];
+      }
+      return nativeKeys(object);
+    };
+
+    /**
+     * Used to convert characters to HTML entities:
+     *
+     * Though the `>` character is escaped for symmetry, characters like `>` and `/`
+     * don't require escaping in HTML and have no special meaning unless they're part
+     * of a tag or an unquoted attribute value.
+     * http://mathiasbynens.be/notes/ambiguous-ampersands (under "semi-related fun fact")
+     */
+    var htmlEscapes = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    };
+
+    /** Used to convert HTML entities to characters */
+    var htmlUnescapes = invert(htmlEscapes);
+
+    /*--------------------------------------------------------------------------*/
+
+    /**
+     * Assigns own enumerable properties of source object(s) to the destination
+     * object. Subsequent sources will overwrite property assignments of previous
+     * sources. If a `callback` function is passed, it will be executed to produce
+     * the assigned values. The `callback` is bound to `thisArg` and invoked with
+     * two arguments; (objectValue, sourceValue).
+     *
+     * @static
+     * @memberOf _
+     * @type Function
+     * @alias extend
+     * @category Objects
+     * @param {Object} object The destination object.
+     * @param {Object} [source1, source2, ...] The source objects.
+     * @param {Function} [callback] The function to customize assigning values.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Object} Returns the destination object.
+     * @example
+     *
+     * _.assign({ 'name': 'moe' }, { 'age': 40 });
+     * // => { 'name': 'moe', 'age': 40 }
+     *
+     * var defaults = _.partialRight(_.assign, function(a, b) {
+     *   return typeof a == 'undefined' ? b : a;
+     * });
+     *
+     * var food = { 'name': 'apple' };
+     * defaults(food, { 'name': 'banana', 'type': 'fruit' });
+     * // => { 'name': 'apple', 'type': 'fruit' }
+     */
+    var assign = function (object, source, guard) {
+      var index, iterable = object, result = iterable;
+      if (!iterable) return result;
+      var args = arguments,
+          argsIndex = 0,
+          argsLength = typeof guard == 'number' ? 2 : args.length;
+      if (argsLength > 3 && typeof args[argsLength - 2] == 'function') {
+        var callback = lodash.createCallback(args[--argsLength - 1], args[argsLength--], 2);
+      } else if (argsLength > 2 && typeof args[argsLength - 1] == 'function') {
+        callback = args[--argsLength];
+      }
+      while (++argsIndex < argsLength) {
+        iterable = args[argsIndex];
+        if (iterable && objectTypes[typeof iterable]) {    
+        var ownIndex = -1,
+            ownProps = objectTypes[typeof iterable] && keys(iterable),
+            length = ownProps ? ownProps.length : 0;
+
+        while (++ownIndex < length) {
+          index = ownProps[ownIndex];
+          result[index] = callback ? callback(result[index], iterable[index]) : iterable[index];    
+        }    
+        }
+      }
+      return result
+    };
+
+    /**
+     * Creates a clone of `value`. If `deep` is `true`, nested objects will also
+     * be cloned, otherwise they will be assigned by reference. If a `callback`
+     * function is passed, it will be executed to produce the cloned values. If
+     * `callback` returns `undefined`, cloning will be handled by the method instead.
+     * The `callback` is bound to `thisArg` and invoked with one argument; (value).
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to clone.
+     * @param {Boolean} [deep=false] A flag to indicate a deep clone.
+     * @param {Function} [callback] The function to customize cloning values.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @param- {Array} [stackA=[]] Tracks traversed source objects.
+     * @param- {Array} [stackB=[]] Associates clones with source counterparts.
+     * @returns {Mixed} Returns the cloned `value`.
+     * @example
+     *
+     * var stooges = [
+     *   { 'name': 'moe', 'age': 40 },
+     *   { 'name': 'larry', 'age': 50 }
+     * ];
+     *
+     * var shallow = _.clone(stooges);
+     * shallow[0] === stooges[0];
+     * // => true
+     *
+     * var deep = _.clone(stooges, true);
+     * deep[0] === stooges[0];
+     * // => false
+     *
+     * _.mixin({
+     *   'clone': _.partialRight(_.clone, function(value) {
+     *     return _.isElement(value) ? value.cloneNode(false) : undefined;
+     *   })
+     * });
+     *
+     * var clone = _.clone(document.body);
+     * clone.childNodes.length;
+     * // => 0
+     */
+    function clone(value, deep, callback, thisArg, stackA, stackB) {
+      var result = value;
+
+      // allows working with "Collections" methods without using their `callback`
+      // argument, `index|key`, for this method's `callback`
+      if (typeof deep != 'boolean' && deep != null) {
+        thisArg = callback;
+        callback = deep;
+        deep = false;
+      }
+      if (typeof callback == 'function') {
+        callback = (typeof thisArg == 'undefined')
+          ? callback
+          : lodash.createCallback(callback, thisArg, 1);
+
+        result = callback(result);
+        if (typeof result != 'undefined') {
+          return result;
+        }
+        result = value;
+      }
+      // inspect [[Class]]
+      var isObj = isObject(result);
+      if (isObj) {
+        var className = toString.call(result);
+        if (!cloneableClasses[className]) {
+          return result;
+        }
+        var isArr = isArray(result);
+      }
+      // shallow clone
+      if (!isObj || !deep) {
+        return isObj
+          ? (isArr ? slice(result) : assign({}, result))
+          : result;
+      }
+      var ctor = ctorByClass[className];
+      switch (className) {
+        case boolClass:
+        case dateClass:
+          return new ctor(+result);
+
+        case numberClass:
+        case stringClass:
+          return new ctor(result);
+
+        case regexpClass:
+          return ctor(result.source, reFlags.exec(result));
+      }
+      // check for circular references and return corresponding clone
+      var initedStack = !stackA;
+      stackA || (stackA = getArray());
+      stackB || (stackB = getArray());
+
+      var length = stackA.length;
+      while (length--) {
+        if (stackA[length] == value) {
+          return stackB[length];
+        }
+      }
+      // init cloned object
+      result = isArr ? ctor(result.length) : {};
+
+      // add array properties assigned by `RegExp#exec`
+      if (isArr) {
+        if (hasOwnProperty.call(value, 'index')) {
+          result.index = value.index;
+        }
+        if (hasOwnProperty.call(value, 'input')) {
+          result.input = value.input;
+        }
+      }
+      // add the source value to the stack of traversed objects
+      // and associate it with its clone
+      stackA.push(value);
+      stackB.push(result);
+
+      // recursively populate clone (susceptible to call stack limits)
+      (isArr ? forEach : forOwn)(value, function(objValue, key) {
+        result[key] = clone(objValue, deep, callback, undefined, stackA, stackB);
+      });
+
+      if (initedStack) {
+        releaseArray(stackA);
+        releaseArray(stackB);
+      }
+      return result;
+    }
+
+    /**
+     * Creates a deep clone of `value`. If a `callback` function is passed,
+     * it will be executed to produce the cloned values. If `callback` returns
+     * `undefined`, cloning will be handled by the method instead. The `callback`
+     * is bound to `thisArg` and invoked with one argument; (value).
+     *
+     * Note: This method is loosely based on the structured clone algorithm. Functions
+     * and DOM nodes are **not** cloned. The enumerable properties of `arguments` objects and
+     * objects created by constructors other than `Object` are cloned to plain `Object` objects.
+     * See http://www.w3.org/TR/html5/infrastructure.html#internal-structured-cloning-algorithm.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to deep clone.
+     * @param {Function} [callback] The function to customize cloning values.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Mixed} Returns the deep cloned `value`.
+     * @example
+     *
+     * var stooges = [
+     *   { 'name': 'moe', 'age': 40 },
+     *   { 'name': 'larry', 'age': 50 }
+     * ];
+     *
+     * var deep = _.cloneDeep(stooges);
+     * deep[0] === stooges[0];
+     * // => false
+     *
+     * var view = {
+     *   'label': 'docs',
+     *   'node': element
+     * };
+     *
+     * var clone = _.cloneDeep(view, function(value) {
+     *   return _.isElement(value) ? value.cloneNode(true) : undefined;
+     * });
+     *
+     * clone.node == view.node;
+     * // => false
+     */
+    function cloneDeep(value, callback, thisArg) {
+      return clone(value, true, callback, thisArg);
+    }
+
+    /**
+     * Assigns own enumerable properties of source object(s) to the destination
+     * object for all destination properties that resolve to `undefined`. Once a
+     * property is set, additional defaults of the same property will be ignored.
+     *
+     * @static
+     * @memberOf _
+     * @type Function
+     * @category Objects
+     * @param {Object} object The destination object.
+     * @param {Object} [source1, source2, ...] The source objects.
+     * @param- {Object} [guard] Allows working with `_.reduce` without using its
+     *  callback's `key` and `object` arguments as sources.
+     * @returns {Object} Returns the destination object.
+     * @example
+     *
+     * var food = { 'name': 'apple' };
+     * _.defaults(food, { 'name': 'banana', 'type': 'fruit' });
+     * // => { 'name': 'apple', 'type': 'fruit' }
+     */
+    var defaults = function (object, source, guard) {
+      var index, iterable = object, result = iterable;
+      if (!iterable) return result;
+      var args = arguments,
+          argsIndex = 0,
+          argsLength = typeof guard == 'number' ? 2 : args.length;
+      while (++argsIndex < argsLength) {
+        iterable = args[argsIndex];
+        if (iterable && objectTypes[typeof iterable]) {    
+        var ownIndex = -1,
+            ownProps = objectTypes[typeof iterable] && keys(iterable),
+            length = ownProps ? ownProps.length : 0;
+
+        while (++ownIndex < length) {
+          index = ownProps[ownIndex];
+          if (typeof result[index] == 'undefined') result[index] = iterable[index];    
+        }    
+        }
+      }
+      return result
+    };
+
+    /**
+     * This method is similar to `_.find`, except that it returns the key of the
+     * element that passes the callback check, instead of the element itself.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Object} object The object to search.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Mixed} Returns the key of the found element, else `undefined`.
+     * @example
+     *
+     * _.findKey({ 'a': 1, 'b': 2, 'c': 3, 'd': 4 }, function(num) {
+     *   return num % 2 == 0;
+     * });
+     * // => 'b'
+     */
+    function findKey(object, callback, thisArg) {
+      var result;
+      callback = lodash.createCallback(callback, thisArg);
+      forOwn(object, function(value, key, object) {
+        if (callback(value, key, object)) {
+          result = key;
+          return false;
+        }
+      });
+      return result;
+    }
+
+    /**
+     * Iterates over `object`'s own and inherited enumerable properties, executing
+     * the `callback` for each property. The `callback` is bound to `thisArg` and
+     * invoked with three arguments; (value, key, object). Callbacks may exit iteration
+     * early by explicitly returning `false`.
+     *
+     * @static
+     * @memberOf _
+     * @type Function
+     * @category Objects
+     * @param {Object} object The object to iterate over.
+     * @param {Function} [callback=identity] The function called per iteration.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Object} Returns `object`.
+     * @example
+     *
+     * function Dog(name) {
+     *   this.name = name;
+     * }
+     *
+     * Dog.prototype.bark = function() {
+     *   alert('Woof, woof!');
+     * };
+     *
+     * _.forIn(new Dog('Dagny'), function(value, key) {
+     *   alert(key);
+     * });
+     * // => alerts 'name' and 'bark' (order is not guaranteed)
+     */
+    var forIn = function (collection, callback, thisArg) {
+      var index, iterable = collection, result = iterable;
+      if (!iterable) return result;
+      if (!objectTypes[typeof iterable]) return result;
+      callback = callback && typeof thisArg == 'undefined' ? callback : lodash.createCallback(callback, thisArg);    
+        for (index in iterable) {
+          if (callback(iterable[index], index, collection) === false) return result;    
+        }    
+      return result
+    };
+
+    /**
+     * Iterates over an object's own enumerable properties, executing the `callback`
+     * for each property. The `callback` is bound to `thisArg` and invoked with three
+     * arguments; (value, key, object). Callbacks may exit iteration early by explicitly
+     * returning `false`.
+     *
+     * @static
+     * @memberOf _
+     * @type Function
+     * @category Objects
+     * @param {Object} object The object to iterate over.
+     * @param {Function} [callback=identity] The function called per iteration.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Object} Returns `object`.
+     * @example
+     *
+     * _.forOwn({ '0': 'zero', '1': 'one', 'length': 2 }, function(num, key) {
+     *   alert(key);
+     * });
+     * // => alerts '0', '1', and 'length' (order is not guaranteed)
+     */
+    var forOwn = function (collection, callback, thisArg) {
+      var index, iterable = collection, result = iterable;
+      if (!iterable) return result;
+      if (!objectTypes[typeof iterable]) return result;
+      callback = callback && typeof thisArg == 'undefined' ? callback : lodash.createCallback(callback, thisArg);    
+        var ownIndex = -1,
+            ownProps = objectTypes[typeof iterable] && keys(iterable),
+            length = ownProps ? ownProps.length : 0;
+
+        while (++ownIndex < length) {
+          index = ownProps[ownIndex];
+          if (callback(iterable[index], index, collection) === false) return result;    
+        }    
+      return result
+    };
+
+    /**
+     * Creates a sorted array of all enumerable properties, own and inherited,
+     * of `object` that have function values.
+     *
+     * @static
+     * @memberOf _
+     * @alias methods
+     * @category Objects
+     * @param {Object} object The object to inspect.
+     * @returns {Array} Returns a new array of property names that have function values.
+     * @example
+     *
+     * _.functions(_);
+     * // => ['all', 'any', 'bind', 'bindAll', 'clone', 'compact', 'compose', ...]
+     */
+    function functions(object) {
+      var result = [];
+      forIn(object, function(value, key) {
+        if (isFunction(value)) {
+          result.push(key);
+        }
+      });
+      return result.sort();
+    }
+
+    /**
+     * Checks if the specified object `property` exists and is a direct property,
+     * instead of an inherited property.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Object} object The object to check.
+     * @param {String} property The property to check for.
+     * @returns {Boolean} Returns `true` if key is a direct property, else `false`.
+     * @example
+     *
+     * _.has({ 'a': 1, 'b': 2, 'c': 3 }, 'b');
+     * // => true
+     */
+    function has(object, property) {
+      return object ? hasOwnProperty.call(object, property) : false;
+    }
+
+    /**
+     * Creates an object composed of the inverted keys and values of the given `object`.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Object} object The object to invert.
+     * @returns {Object} Returns the created inverted object.
+     * @example
+     *
+     *  _.invert({ 'first': 'moe', 'second': 'larry' });
+     * // => { 'moe': 'first', 'larry': 'second' }
+     */
+    function invert(object) {
+      var index = -1,
+          props = keys(object),
+          length = props.length,
+          result = {};
+
+      while (++index < length) {
+        var key = props[index];
+        result[object[key]] = key;
+      }
+      return result;
+    }
+
+    /**
+     * Checks if `value` is a boolean value.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is a boolean value, else `false`.
+     * @example
+     *
+     * _.isBoolean(null);
+     * // => false
+     */
+    function isBoolean(value) {
+      return value === true || value === false || toString.call(value) == boolClass;
+    }
+
+    /**
+     * Checks if `value` is a date.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is a date, else `false`.
+     * @example
+     *
+     * _.isDate(new Date);
+     * // => true
+     */
+    function isDate(value) {
+      return value ? (typeof value == 'object' && toString.call(value) == dateClass) : false;
+    }
+
+    /**
+     * Checks if `value` is a DOM element.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is a DOM element, else `false`.
+     * @example
+     *
+     * _.isElement(document.body);
+     * // => true
+     */
+    function isElement(value) {
+      return value ? value.nodeType === 1 : false;
+    }
+
+    /**
+     * Checks if `value` is empty. Arrays, strings, or `arguments` objects with a
+     * length of `0` and objects with no own enumerable properties are considered
+     * "empty".
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Array|Object|String} value The value to inspect.
+     * @returns {Boolean} Returns `true`, if the `value` is empty, else `false`.
+     * @example
+     *
+     * _.isEmpty([1, 2, 3]);
+     * // => false
+     *
+     * _.isEmpty({});
+     * // => true
+     *
+     * _.isEmpty('');
+     * // => true
+     */
+    function isEmpty(value) {
+      var result = true;
+      if (!value) {
+        return result;
+      }
+      var className = toString.call(value),
+          length = value.length;
+
+      if ((className == arrayClass || className == stringClass || className == argsClass ) ||
+          (className == objectClass && typeof length == 'number' && isFunction(value.splice))) {
+        return !length;
+      }
+      forOwn(value, function() {
+        return (result = false);
+      });
+      return result;
+    }
+
+    /**
+     * Performs a deep comparison between two values to determine if they are
+     * equivalent to each other. If `callback` is passed, it will be executed to
+     * compare values. If `callback` returns `undefined`, comparisons will be handled
+     * by the method instead. The `callback` is bound to `thisArg` and invoked with
+     * two arguments; (a, b).
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} a The value to compare.
+     * @param {Mixed} b The other value to compare.
+     * @param {Function} [callback] The function to customize comparing values.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @param- {Array} [stackA=[]] Tracks traversed `a` objects.
+     * @param- {Array} [stackB=[]] Tracks traversed `b` objects.
+     * @returns {Boolean} Returns `true`, if the values are equivalent, else `false`.
+     * @example
+     *
+     * var moe = { 'name': 'moe', 'age': 40 };
+     * var copy = { 'name': 'moe', 'age': 40 };
+     *
+     * moe == copy;
+     * // => false
+     *
+     * _.isEqual(moe, copy);
+     * // => true
+     *
+     * var words = ['hello', 'goodbye'];
+     * var otherWords = ['hi', 'goodbye'];
+     *
+     * _.isEqual(words, otherWords, function(a, b) {
+     *   var reGreet = /^(?:hello|hi)$/i,
+     *       aGreet = _.isString(a) && reGreet.test(a),
+     *       bGreet = _.isString(b) && reGreet.test(b);
+     *
+     *   return (aGreet || bGreet) ? (aGreet == bGreet) : undefined;
+     * });
+     * // => true
+     */
+    function isEqual(a, b, callback, thisArg, stackA, stackB) {
+      // used to indicate that when comparing objects, `a` has at least the properties of `b`
+      var whereIndicator = callback === indicatorObject;
+      if (typeof callback == 'function' && !whereIndicator) {
+        callback = lodash.createCallback(callback, thisArg, 2);
+        var result = callback(a, b);
+        if (typeof result != 'undefined') {
+          return !!result;
+        }
+      }
+      // exit early for identical values
+      if (a === b) {
+        // treat `+0` vs. `-0` as not equal
+        return a !== 0 || (1 / a == 1 / b);
+      }
+      var type = typeof a,
+          otherType = typeof b;
+
+      // exit early for unlike primitive values
+      if (a === a &&
+          (!a || (type != 'function' && type != 'object')) &&
+          (!b || (otherType != 'function' && otherType != 'object'))) {
+        return false;
+      }
+      // exit early for `null` and `undefined`, avoiding ES3's Function#call behavior
+      // http://es5.github.com/#x15.3.4.4
+      if (a == null || b == null) {
+        return a === b;
+      }
+      // compare [[Class]] names
+      var className = toString.call(a),
+          otherClass = toString.call(b);
+
+      if (className == argsClass) {
+        className = objectClass;
+      }
+      if (otherClass == argsClass) {
+        otherClass = objectClass;
+      }
+      if (className != otherClass) {
+        return false;
+      }
+      switch (className) {
+        case boolClass:
+        case dateClass:
+          // coerce dates and booleans to numbers, dates to milliseconds and booleans
+          // to `1` or `0`, treating invalid dates coerced to `NaN` as not equal
+          return +a == +b;
+
+        case numberClass:
+          // treat `NaN` vs. `NaN` as equal
+          return (a != +a)
+            ? b != +b
+            // but treat `+0` vs. `-0` as not equal
+            : (a == 0 ? (1 / a == 1 / b) : a == +b);
+
+        case regexpClass:
+        case stringClass:
+          // coerce regexes to strings (http://es5.github.com/#x15.10.6.4)
+          // treat string primitives and their corresponding object instances as equal
+          return a == String(b);
+      }
+      var isArr = className == arrayClass;
+      if (!isArr) {
+        // unwrap any `lodash` wrapped values
+        if (hasOwnProperty.call(a, '__wrapped__ ') || hasOwnProperty.call(b, '__wrapped__')) {
+          return isEqual(a.__wrapped__ || a, b.__wrapped__ || b, callback, thisArg, stackA, stackB);
+        }
+        // exit for functions and DOM nodes
+        if (className != objectClass) {
+          return false;
+        }
+        // in older versions of Opera, `arguments` objects have `Array` constructors
+        var ctorA = a.constructor,
+            ctorB = b.constructor;
+
+        // non `Object` object instances with different constructors are not equal
+        if (ctorA != ctorB && !(
+              isFunction(ctorA) && ctorA instanceof ctorA &&
+              isFunction(ctorB) && ctorB instanceof ctorB
+            )) {
+          return false;
+        }
+      }
+      // assume cyclic structures are equal
+      // the algorithm for detecting cyclic structures is adapted from ES 5.1
+      // section 15.12.3, abstract operation `JO` (http://es5.github.com/#x15.12.3)
+      var initedStack = !stackA;
+      stackA || (stackA = getArray());
+      stackB || (stackB = getArray());
+
+      var length = stackA.length;
+      while (length--) {
+        if (stackA[length] == a) {
+          return stackB[length] == b;
+        }
+      }
+      var size = 0;
+      result = true;
+
+      // add `a` and `b` to the stack of traversed objects
+      stackA.push(a);
+      stackB.push(b);
+
+      // recursively compare objects and arrays (susceptible to call stack limits)
+      if (isArr) {
+        length = a.length;
+        size = b.length;
+
+        // compare lengths to determine if a deep comparison is necessary
+        result = size == a.length;
+        if (!result && !whereIndicator) {
+          return result;
+        }
+        // deep compare the contents, ignoring non-numeric properties
+        while (size--) {
+          var index = length,
+              value = b[size];
+
+          if (whereIndicator) {
+            while (index--) {
+              if ((result = isEqual(a[index], value, callback, thisArg, stackA, stackB))) {
+                break;
+              }
+            }
+          } else if (!(result = isEqual(a[size], value, callback, thisArg, stackA, stackB))) {
+            break;
+          }
+        }
+        return result;
+      }
+      // deep compare objects using `forIn`, instead of `forOwn`, to avoid `Object.keys`
+      // which, in this case, is more costly
+      forIn(b, function(value, key, b) {
+        if (hasOwnProperty.call(b, key)) {
+          // count the number of properties.
+          size++;
+          // deep compare each property value.
+          return (result = hasOwnProperty.call(a, key) && isEqual(a[key], value, callback, thisArg, stackA, stackB));
+        }
+      });
+
+      if (result && !whereIndicator) {
+        // ensure both objects have the same number of properties
+        forIn(a, function(value, key, a) {
+          if (hasOwnProperty.call(a, key)) {
+            // `size` will be `-1` if `a` has more properties than `b`
+            return (result = --size > -1);
+          }
+        });
+      }
+      if (initedStack) {
+        releaseArray(stackA);
+        releaseArray(stackB);
+      }
+      return result;
+    }
+
+    /**
+     * Checks if `value` is, or can be coerced to, a finite number.
+     *
+     * Note: This is not the same as native `isFinite`, which will return true for
+     * booleans and empty strings. See http://es5.github.com/#x15.1.2.5.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is finite, else `false`.
+     * @example
+     *
+     * _.isFinite(-101);
+     * // => true
+     *
+     * _.isFinite('10');
+     * // => true
+     *
+     * _.isFinite(true);
+     * // => false
+     *
+     * _.isFinite('');
+     * // => false
+     *
+     * _.isFinite(Infinity);
+     * // => false
+     */
+    function isFinite(value) {
+      return nativeIsFinite(value) && !nativeIsNaN(parseFloat(value));
+    }
+
+    /**
+     * Checks if `value` is a function.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is a function, else `false`.
+     * @example
+     *
+     * _.isFunction(_);
+     * // => true
+     */
+    function isFunction(value) {
+      return typeof value == 'function';
+    }
+
+    /**
+     * Checks if `value` is the language type of Object.
+     * (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is an object, else `false`.
+     * @example
+     *
+     * _.isObject({});
+     * // => true
+     *
+     * _.isObject([1, 2, 3]);
+     * // => true
+     *
+     * _.isObject(1);
+     * // => false
+     */
+    function isObject(value) {
+      // check if the value is the ECMAScript language type of Object
+      // http://es5.github.com/#x8
+      // and avoid a V8 bug
+      // http://code.google.com/p/v8/issues/detail?id=2291
+      return !!(value && objectTypes[typeof value]);
+    }
+
+    /**
+     * Checks if `value` is `NaN`.
+     *
+     * Note: This is not the same as native `isNaN`, which will return `true` for
+     * `undefined` and other values. See http://es5.github.com/#x15.1.2.4.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is `NaN`, else `false`.
+     * @example
+     *
+     * _.isNaN(NaN);
+     * // => true
+     *
+     * _.isNaN(new Number(NaN));
+     * // => true
+     *
+     * isNaN(undefined);
+     * // => true
+     *
+     * _.isNaN(undefined);
+     * // => false
+     */
+    function isNaN(value) {
+      // `NaN` as a primitive is the only value that is not equal to itself
+      // (perform the [[Class]] check first to avoid errors with some host objects in IE)
+      return isNumber(value) && value != +value
+    }
+
+    /**
+     * Checks if `value` is `null`.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is `null`, else `false`.
+     * @example
+     *
+     * _.isNull(null);
+     * // => true
+     *
+     * _.isNull(undefined);
+     * // => false
+     */
+    function isNull(value) {
+      return value === null;
+    }
+
+    /**
+     * Checks if `value` is a number.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is a number, else `false`.
+     * @example
+     *
+     * _.isNumber(8.4 * 5);
+     * // => true
+     */
+    function isNumber(value) {
+      return typeof value == 'number' || toString.call(value) == numberClass;
+    }
+
+    /**
+     * Checks if a given `value` is an object created by the `Object` constructor.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if `value` is a plain object, else `false`.
+     * @example
+     *
+     * function Stooge(name, age) {
+     *   this.name = name;
+     *   this.age = age;
+     * }
+     *
+     * _.isPlainObject(new Stooge('moe', 40));
+     * // => false
+     *
+     * _.isPlainObject([1, 2, 3]);
+     * // => false
+     *
+     * _.isPlainObject({ 'name': 'moe', 'age': 40 });
+     * // => true
+     */
+    var isPlainObject = function(value) {
+      if (!(value && toString.call(value) == objectClass)) {
+        return false;
+      }
+      var valueOf = value.valueOf,
+          objProto = typeof valueOf == 'function' && (objProto = getPrototypeOf(valueOf)) && getPrototypeOf(objProto);
+
+      return objProto
+        ? (value == objProto || getPrototypeOf(value) == objProto)
+        : shimIsPlainObject(value);
+    };
+
+    /**
+     * Checks if `value` is a regular expression.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is a regular expression, else `false`.
+     * @example
+     *
+     * _.isRegExp(/moe/);
+     * // => true
+     */
+    function isRegExp(value) {
+      return value ? (typeof value == 'object' && toString.call(value) == regexpClass) : false;
+    }
+
+    /**
+     * Checks if `value` is a string.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is a string, else `false`.
+     * @example
+     *
+     * _.isString('moe');
+     * // => true
+     */
+    function isString(value) {
+      return typeof value == 'string' || toString.call(value) == stringClass;
+    }
+
+    /**
+     * Checks if `value` is `undefined`.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Mixed} value The value to check.
+     * @returns {Boolean} Returns `true`, if the `value` is `undefined`, else `false`.
+     * @example
+     *
+     * _.isUndefined(void 0);
+     * // => true
+     */
+    function isUndefined(value) {
+      return typeof value == 'undefined';
+    }
+
+    /**
+     * Recursively merges own enumerable properties of the source object(s), that
+     * don't resolve to `undefined`, into the destination object. Subsequent sources
+     * will overwrite property assignments of previous sources. If a `callback` function
+     * is passed, it will be executed to produce the merged values of the destination
+     * and source properties. If `callback` returns `undefined`, merging will be
+     * handled by the method instead. The `callback` is bound to `thisArg` and
+     * invoked with two arguments; (objectValue, sourceValue).
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Object} object The destination object.
+     * @param {Object} [source1, source2, ...] The source objects.
+     * @param {Function} [callback] The function to customize merging properties.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @param- {Object} [deepIndicator] Indicates that `stackA` and `stackB` are
+     *  arrays of traversed objects, instead of source objects.
+     * @param- {Array} [stackA=[]] Tracks traversed source objects.
+     * @param- {Array} [stackB=[]] Associates values with source counterparts.
+     * @returns {Object} Returns the destination object.
+     * @example
+     *
+     * var names = {
+     *   'stooges': [
+     *     { 'name': 'moe' },
+     *     { 'name': 'larry' }
+     *   ]
+     * };
+     *
+     * var ages = {
+     *   'stooges': [
+     *     { 'age': 40 },
+     *     { 'age': 50 }
+     *   ]
+     * };
+     *
+     * _.merge(names, ages);
+     * // => { 'stooges': [{ 'name': 'moe', 'age': 40 }, { 'name': 'larry', 'age': 50 }] }
+     *
+     * var food = {
+     *   'fruits': ['apple'],
+     *   'vegetables': ['beet']
+     * };
+     *
+     * var otherFood = {
+     *   'fruits': ['banana'],
+     *   'vegetables': ['carrot']
+     * };
+     *
+     * _.merge(food, otherFood, function(a, b) {
+     *   return _.isArray(a) ? a.concat(b) : undefined;
+     * });
+     * // => { 'fruits': ['apple', 'banana'], 'vegetables': ['beet', 'carrot] }
+     */
+    function merge(object, source, deepIndicator) {
+      var args = arguments,
+          index = 0,
+          length = 2;
+
+      if (!isObject(object)) {
+        return object;
+      }
+      if (deepIndicator === indicatorObject) {
+        var callback = args[3],
+            stackA = args[4],
+            stackB = args[5];
+      } else {
+        var initedStack = true;
+        stackA = getArray();
+        stackB = getArray();
+
+        // allows working with `_.reduce` and `_.reduceRight` without
+        // using their `callback` arguments, `index|key` and `collection`
+        if (typeof deepIndicator != 'number') {
+          length = args.length;
+        }
+        if (length > 3 && typeof args[length - 2] == 'function') {
+          callback = lodash.createCallback(args[--length - 1], args[length--], 2);
+        } else if (length > 2 && typeof args[length - 1] == 'function') {
+          callback = args[--length];
+        }
+      }
+      while (++index < length) {
+        (isArray(args[index]) ? forEach : forOwn)(args[index], function(source, key) {
+          var found,
+              isArr,
+              result = source,
+              value = object[key];
+
+          if (source && ((isArr = isArray(source)) || isPlainObject(source))) {
+            // avoid merging previously merged cyclic sources
+            var stackLength = stackA.length;
+            while (stackLength--) {
+              if ((found = stackA[stackLength] == source)) {
+                value = stackB[stackLength];
+                break;
+              }
+            }
+            if (!found) {
+              var isShallow;
+              if (callback) {
+                result = callback(value, source);
+                if ((isShallow = typeof result != 'undefined')) {
+                  value = result;
+                }
+              }
+              if (!isShallow) {
+                value = isArr
+                  ? (isArray(value) ? value : [])
+                  : (isPlainObject(value) ? value : {});
+              }
+              // add `source` and associated `value` to the stack of traversed objects
+              stackA.push(source);
+              stackB.push(value);
+
+              // recursively merge objects and arrays (susceptible to call stack limits)
+              if (!isShallow) {
+                value = merge(value, source, indicatorObject, callback, stackA, stackB);
+              }
+            }
+          }
+          else {
+            if (callback) {
+              result = callback(value, source);
+              if (typeof result == 'undefined') {
+                result = source;
+              }
+            }
+            if (typeof result != 'undefined') {
+              value = result;
+            }
+          }
+          object[key] = value;
+        });
+      }
+
+      if (initedStack) {
+        releaseArray(stackA);
+        releaseArray(stackB);
+      }
+      return object;
+    }
+
+    /**
+     * Creates a shallow clone of `object` excluding the specified properties.
+     * Property names may be specified as individual arguments or as arrays of
+     * property names. If a `callback` function is passed, it will be executed
+     * for each property in the `object`, omitting the properties `callback`
+     * returns truthy for. The `callback` is bound to `thisArg` and invoked
+     * with three arguments; (value, key, object).
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Object} object The source object.
+     * @param {Function|String} callback|[prop1, prop2, ...] The properties to omit
+     *  or the function called per iteration.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Object} Returns an object without the omitted properties.
+     * @example
+     *
+     * _.omit({ 'name': 'moe', 'age': 40 }, 'age');
+     * // => { 'name': 'moe' }
+     *
+     * _.omit({ 'name': 'moe', 'age': 40 }, function(value) {
+     *   return typeof value == 'number';
+     * });
+     * // => { 'name': 'moe' }
+     */
+    function omit(object, callback, thisArg) {
+      var indexOf = getIndexOf(),
+          isFunc = typeof callback == 'function',
+          result = {};
+
+      if (isFunc) {
+        callback = lodash.createCallback(callback, thisArg);
+      } else {
+        var props = concat.apply(arrayRef, nativeSlice.call(arguments, 1));
+      }
+      forIn(object, function(value, key, object) {
+        if (isFunc
+              ? !callback(value, key, object)
+              : indexOf(props, key) < 0
+            ) {
+          result[key] = value;
+        }
+      });
+      return result;
+    }
+
+    /**
+     * Creates a two dimensional array of the given object's key-value pairs,
+     * i.e. `[[key1, value1], [key2, value2]]`.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Object} object The object to inspect.
+     * @returns {Array} Returns new array of key-value pairs.
+     * @example
+     *
+     * _.pairs({ 'moe': 30, 'larry': 40 });
+     * // => [['moe', 30], ['larry', 40]] (order is not guaranteed)
+     */
+    function pairs(object) {
+      var index = -1,
+          props = keys(object),
+          length = props.length,
+          result = Array(length);
+
+      while (++index < length) {
+        var key = props[index];
+        result[index] = [key, object[key]];
+      }
+      return result;
+    }
+
+    /**
+     * Creates a shallow clone of `object` composed of the specified properties.
+     * Property names may be specified as individual arguments or as arrays of property
+     * names. If `callback` is passed, it will be executed for each property in the
+     * `object`, picking the properties `callback` returns truthy for. The `callback`
+     * is bound to `thisArg` and invoked with three arguments; (value, key, object).
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Object} object The source object.
+     * @param {Array|Function|String} callback|[prop1, prop2, ...] The function called
+     *  per iteration or properties to pick, either as individual arguments or arrays.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Object} Returns an object composed of the picked properties.
+     * @example
+     *
+     * _.pick({ 'name': 'moe', '_userid': 'moe1' }, 'name');
+     * // => { 'name': 'moe' }
+     *
+     * _.pick({ 'name': 'moe', '_userid': 'moe1' }, function(value, key) {
+     *   return key.charAt(0) != '_';
+     * });
+     * // => { 'name': 'moe' }
+     */
+    function pick(object, callback, thisArg) {
+      var result = {};
+      if (typeof callback != 'function') {
+        var index = -1,
+            props = concat.apply(arrayRef, nativeSlice.call(arguments, 1)),
+            length = isObject(object) ? props.length : 0;
+
+        while (++index < length) {
+          var key = props[index];
+          if (key in object) {
+            result[key] = object[key];
+          }
+        }
+      } else {
+        callback = lodash.createCallback(callback, thisArg);
+        forIn(object, function(value, key, object) {
+          if (callback(value, key, object)) {
+            result[key] = value;
+          }
+        });
+      }
+      return result;
+    }
+
+    /**
+     * An alternative to `_.reduce`, this method transforms an `object` to a new
+     * `accumulator` object which is the result of running each of its elements
+     * through the `callback`, with each `callback` execution potentially mutating
+     * the `accumulator` object. The `callback` is bound to `thisArg` and invoked
+     * with four arguments; (accumulator, value, key, object). Callbacks may exit
+     * iteration early by explicitly returning `false`.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Array|Object} collection The collection to iterate over.
+     * @param {Function} [callback=identity] The function called per iteration.
+     * @param {Mixed} [accumulator] The custom accumulator value.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Mixed} Returns the accumulated value.
+     * @example
+     *
+     * var squares = _.transform([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], function(result, num) {
+     *   num *= num;
+     *   if (num % 2) {
+     *     return result.push(num) < 3;
+     *   }
+     * });
+     * // => [1, 9, 25]
+     *
+     * var mapped = _.transform({ 'a': 1, 'b': 2, 'c': 3 }, function(result, num, key) {
+     *   result[key] = num * 3;
+     * });
+     * // => { 'a': 3, 'b': 6, 'c': 9 }
+     */
+    function transform(object, callback, accumulator, thisArg) {
+      var isArr = isArray(object);
+      callback = lodash.createCallback(callback, thisArg, 4);
+
+      if (accumulator == null) {
+        if (isArr) {
+          accumulator = [];
+        } else {
+          var ctor = object && object.constructor,
+              proto = ctor && ctor.prototype;
+
+          accumulator = createObject(proto);
+        }
+      }
+      (isArr ? forEach : forOwn)(object, function(value, index, object) {
+        return callback(accumulator, value, index, object);
+      });
+      return accumulator;
+    }
+
+    /**
+     * Creates an array composed of the own enumerable property values of `object`.
+     *
+     * @static
+     * @memberOf _
+     * @category Objects
+     * @param {Object} object The object to inspect.
+     * @returns {Array} Returns a new array of property values.
+     * @example
+     *
+     * _.values({ 'one': 1, 'two': 2, 'three': 3 });
+     * // => [1, 2, 3] (order is not guaranteed)
+     */
+    function values(object) {
+      var index = -1,
+          props = keys(object),
+          length = props.length,
+          result = Array(length);
+
+      while (++index < length) {
+        result[index] = object[props[index]];
+      }
+      return result;
+    }
+
+    /*--------------------------------------------------------------------------*/
+
+    /**
+     * Creates an array of elements from the specified indexes, or keys, of the
+     * `collection`. Indexes may be specified as individual arguments or as arrays
+     * of indexes.
+     *
+     * @static
+     * @memberOf _
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Array|Number|String} [index1, index2, ...] The indexes of
+     *  `collection` to retrieve, either as individual arguments or arrays.
+     * @returns {Array} Returns a new array of elements corresponding to the
+     *  provided indexes.
+     * @example
+     *
+     * _.at(['a', 'b', 'c', 'd', 'e'], [0, 2, 4]);
+     * // => ['a', 'c', 'e']
+     *
+     * _.at(['moe', 'larry', 'curly'], 0, 2);
+     * // => ['moe', 'curly']
+     */
+    function at(collection) {
+      var index = -1,
+          props = concat.apply(arrayRef, nativeSlice.call(arguments, 1)),
+          length = props.length,
+          result = Array(length);
+
+      while(++index < length) {
+        result[index] = collection[props[index]];
+      }
+      return result;
+    }
+
+    /**
+     * Checks if a given `target` element is present in a `collection` using strict
+     * equality for comparisons, i.e. `===`. If `fromIndex` is negative, it is used
+     * as the offset from the end of the collection.
+     *
+     * @static
+     * @memberOf _
+     * @alias include
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Mixed} target The value to check for.
+     * @param {Number} [fromIndex=0] The index to search from.
+     * @returns {Boolean} Returns `true` if the `target` element is found, else `false`.
+     * @example
+     *
+     * _.contains([1, 2, 3], 1);
+     * // => true
+     *
+     * _.contains([1, 2, 3], 1, 2);
+     * // => false
+     *
+     * _.contains({ 'name': 'moe', 'age': 40 }, 'moe');
+     * // => true
+     *
+     * _.contains('curly', 'ur');
+     * // => true
+     */
+    function contains(collection, target, fromIndex) {
+      var index = -1,
+          indexOf = getIndexOf(),
+          length = collection ? collection.length : 0,
+          result = false;
+
+      fromIndex = (fromIndex < 0 ? nativeMax(0, length + fromIndex) : fromIndex) || 0;
+      if (length && typeof length == 'number') {
+        result = (isString(collection)
+          ? collection.indexOf(target, fromIndex)
+          : indexOf(collection, target, fromIndex)
+        ) > -1;
+      } else {
+        forOwn(collection, function(value) {
+          if (++index >= fromIndex) {
+            return !(result = value === target);
+          }
+        });
+      }
+      return result;
+    }
+
+    /**
+     * Creates an object composed of keys returned from running each element of the
+     * `collection` through the given `callback`. The corresponding value of each key
+     * is the number of times the key was returned by the `callback`. The `callback`
+     * is bound to `thisArg` and invoked with three arguments; (value, index|key, collection).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Object} Returns the composed aggregate object.
+     * @example
+     *
+     * _.countBy([4.3, 6.1, 6.4], function(num) { return Math.floor(num); });
+     * // => { '4': 1, '6': 2 }
+     *
+     * _.countBy([4.3, 6.1, 6.4], function(num) { return this.floor(num); }, Math);
+     * // => { '4': 1, '6': 2 }
+     *
+     * _.countBy(['one', 'two', 'three'], 'length');
+     * // => { '3': 2, '5': 1 }
+     */
+    function countBy(collection, callback, thisArg) {
+      var result = {};
+      callback = lodash.createCallback(callback, thisArg);
+
+      forEach(collection, function(value, key, collection) {
+        key = String(callback(value, key, collection));
+        (hasOwnProperty.call(result, key) ? result[key]++ : result[key] = 1);
+      });
+      return result;
+    }
+
+    /**
+     * Checks if the `callback` returns a truthy value for **all** elements of a
+     * `collection`. The `callback` is bound to `thisArg` and invoked with three
+     * arguments; (value, index|key, collection).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @alias all
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Boolean} Returns `true` if all elements pass the callback check,
+     *  else `false`.
+     * @example
+     *
+     * _.every([true, 1, null, 'yes'], Boolean);
+     * // => false
+     *
+     * var stooges = [
+     *   { 'name': 'moe', 'age': 40 },
+     *   { 'name': 'larry', 'age': 50 }
+     * ];
+     *
+     * // using "_.pluck" callback shorthand
+     * _.every(stooges, 'age');
+     * // => true
+     *
+     * // using "_.where" callback shorthand
+     * _.every(stooges, { 'age': 50 });
+     * // => false
+     */
+    function every(collection, callback, thisArg) {
+      var result = true;
+      callback = lodash.createCallback(callback, thisArg);
+
+      var index = -1,
+          length = collection ? collection.length : 0;
+
+      if (typeof length == 'number') {
+        while (++index < length) {
+          if (!(result = !!callback(collection[index], index, collection))) {
+            break;
+          }
+        }
+      } else {
+        forOwn(collection, function(value, index, collection) {
+          return (result = !!callback(value, index, collection));
+        });
+      }
+      return result;
+    }
+
+    /**
+     * Examines each element in a `collection`, returning an array of all elements
+     * the `callback` returns truthy for. The `callback` is bound to `thisArg` and
+     * invoked with three arguments; (value, index|key, collection).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @alias select
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Array} Returns a new array of elements that passed the callback check.
+     * @example
+     *
+     * var evens = _.filter([1, 2, 3, 4, 5, 6], function(num) { return num % 2 == 0; });
+     * // => [2, 4, 6]
+     *
+     * var food = [
+     *   { 'name': 'apple',  'organic': false, 'type': 'fruit' },
+     *   { 'name': 'carrot', 'organic': true,  'type': 'vegetable' }
+     * ];
+     *
+     * // using "_.pluck" callback shorthand
+     * _.filter(food, 'organic');
+     * // => [{ 'name': 'carrot', 'organic': true, 'type': 'vegetable' }]
+     *
+     * // using "_.where" callback shorthand
+     * _.filter(food, { 'type': 'fruit' });
+     * // => [{ 'name': 'apple', 'organic': false, 'type': 'fruit' }]
+     */
+    function filter(collection, callback, thisArg) {
+      var result = [];
+      callback = lodash.createCallback(callback, thisArg);
+
+      var index = -1,
+          length = collection ? collection.length : 0;
+
+      if (typeof length == 'number') {
+        while (++index < length) {
+          var value = collection[index];
+          if (callback(value, index, collection)) {
+            result.push(value);
+          }
+        }
+      } else {
+        forOwn(collection, function(value, index, collection) {
+          if (callback(value, index, collection)) {
+            result.push(value);
+          }
+        });
+      }
+      return result;
+    }
+
+    /**
+     * Examines each element in a `collection`, returning the first that the `callback`
+     * returns truthy for. The `callback` is bound to `thisArg` and invoked with three
+     * arguments; (value, index|key, collection).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @alias detect, findWhere
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Mixed} Returns the found element, else `undefined`.
+     * @example
+     *
+     * _.find([1, 2, 3, 4], function(num) {
+     *   return num % 2 == 0;
+     * });
+     * // => 2
+     *
+     * var food = [
+     *   { 'name': 'apple',  'organic': false, 'type': 'fruit' },
+     *   { 'name': 'banana', 'organic': true,  'type': 'fruit' },
+     *   { 'name': 'beet',   'organic': false, 'type': 'vegetable' }
+     * ];
+     *
+     * // using "_.where" callback shorthand
+     * _.find(food, { 'type': 'vegetable' });
+     * // => { 'name': 'beet', 'organic': false, 'type': 'vegetable' }
+     *
+     * // using "_.pluck" callback shorthand
+     * _.find(food, 'organic');
+     * // => { 'name': 'banana', 'organic': true, 'type': 'fruit' }
+     */
+    function find(collection, callback, thisArg) {
+      callback = lodash.createCallback(callback, thisArg);
+
+      var index = -1,
+          length = collection ? collection.length : 0;
+
+      if (typeof length == 'number') {
+        while (++index < length) {
+          var value = collection[index];
+          if (callback(value, index, collection)) {
+            return value;
+          }
+        }
+      } else {
+        var result;
+        forOwn(collection, function(value, index, collection) {
+          if (callback(value, index, collection)) {
+            result = value;
+            return false;
+          }
+        });
+        return result;
+      }
+    }
+
+    /**
+     * Iterates over a `collection`, executing the `callback` for each element in
+     * the `collection`. The `callback` is bound to `thisArg` and invoked with three
+     * arguments; (value, index|key, collection). Callbacks may exit iteration early
+     * by explicitly returning `false`.
+     *
+     * @static
+     * @memberOf _
+     * @alias each
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function} [callback=identity] The function called per iteration.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Array|Object|String} Returns `collection`.
+     * @example
+     *
+     * _([1, 2, 3]).forEach(alert).join(',');
+     * // => alerts each number and returns '1,2,3'
+     *
+     * _.forEach({ 'one': 1, 'two': 2, 'three': 3 }, alert);
+     * // => alerts each number value (order is not guaranteed)
+     */
+    function forEach(collection, callback, thisArg) {
+      var index = -1,
+          length = collection ? collection.length : 0;
+
+      callback = callback && typeof thisArg == 'undefined' ? callback : lodash.createCallback(callback, thisArg);
+      if (typeof length == 'number') {
+        while (++index < length) {
+          if (callback(collection[index], index, collection) === false) {
+            break;
+          }
+        }
+      } else {
+        forOwn(collection, callback);
+      }
+      return collection;
+    }
+
+    /**
+     * Creates an object composed of keys returned from running each element of the
+     * `collection` through the `callback`. The corresponding value of each key is
+     * an array of elements passed to `callback` that returned the key. The `callback`
+     * is bound to `thisArg` and invoked with three arguments; (value, index|key, collection).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`
+     *
+     * @static
+     * @memberOf _
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Object} Returns the composed aggregate object.
+     * @example
+     *
+     * _.groupBy([4.2, 6.1, 6.4], function(num) { return Math.floor(num); });
+     * // => { '4': [4.2], '6': [6.1, 6.4] }
+     *
+     * _.groupBy([4.2, 6.1, 6.4], function(num) { return this.floor(num); }, Math);
+     * // => { '4': [4.2], '6': [6.1, 6.4] }
+     *
+     * // using "_.pluck" callback shorthand
+     * _.groupBy(['one', 'two', 'three'], 'length');
+     * // => { '3': ['one', 'two'], '5': ['three'] }
+     */
+    function groupBy(collection, callback, thisArg) {
+      var result = {};
+      callback = lodash.createCallback(callback, thisArg);
+
+      forEach(collection, function(value, key, collection) {
+        key = String(callback(value, key, collection));
+        (hasOwnProperty.call(result, key) ? result[key] : result[key] = []).push(value);
+      });
+      return result;
+    }
+
+    /**
+     * Invokes the method named by `methodName` on each element in the `collection`,
+     * returning an array of the results of each invoked method. Additional arguments
+     * will be passed to each invoked method. If `methodName` is a function, it will
+     * be invoked for, and `this` bound to, each element in the `collection`.
+     *
+     * @static
+     * @memberOf _
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|String} methodName The name of the method to invoke or
+     *  the function invoked per iteration.
+     * @param {Mixed} [arg1, arg2, ...] Arguments to invoke the method with.
+     * @returns {Array} Returns a new array of the results of each invoked method.
+     * @example
+     *
+     * _.invoke([[5, 1, 7], [3, 2, 1]], 'sort');
+     * // => [[1, 5, 7], [1, 2, 3]]
+     *
+     * _.invoke([123, 456], String.prototype.split, '');
+     * // => [['1', '2', '3'], ['4', '5', '6']]
+     */
+    function invoke(collection, methodName) {
+      var args = nativeSlice.call(arguments, 2),
+          index = -1,
+          isFunc = typeof methodName == 'function',
+          length = collection ? collection.length : 0,
+          result = Array(typeof length == 'number' ? length : 0);
+
+      forEach(collection, function(value) {
+        result[++index] = (isFunc ? methodName : value[methodName]).apply(value, args);
+      });
+      return result;
+    }
+
+    /**
+     * Creates an array of values by running each element in the `collection`
+     * through the `callback`. The `callback` is bound to `thisArg` and invoked with
+     * three arguments; (value, index|key, collection).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @alias collect
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Array} Returns a new array of the results of each `callback` execution.
+     * @example
+     *
+     * _.map([1, 2, 3], function(num) { return num * 3; });
+     * // => [3, 6, 9]
+     *
+     * _.map({ 'one': 1, 'two': 2, 'three': 3 }, function(num) { return num * 3; });
+     * // => [3, 6, 9] (order is not guaranteed)
+     *
+     * var stooges = [
+     *   { 'name': 'moe', 'age': 40 },
+     *   { 'name': 'larry', 'age': 50 }
+     * ];
+     *
+     * // using "_.pluck" callback shorthand
+     * _.map(stooges, 'name');
+     * // => ['moe', 'larry']
+     */
+    function map(collection, callback, thisArg) {
+      var index = -1,
+          length = collection ? collection.length : 0;
+
+      callback = lodash.createCallback(callback, thisArg);
+      if (typeof length == 'number') {
+        var result = Array(length);
+        while (++index < length) {
+          result[index] = callback(collection[index], index, collection);
+        }
+      } else {
+        result = [];
+        forOwn(collection, function(value, key, collection) {
+          result[++index] = callback(value, key, collection);
+        });
+      }
+      return result;
+    }
+
+    /**
+     * Retrieves the maximum value of an `array`. If `callback` is passed,
+     * it will be executed for each value in the `array` to generate the
+     * criterion by which the value is ranked. The `callback` is bound to
+     * `thisArg` and invoked with three arguments; (value, index, collection).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Mixed} Returns the maximum value.
+     * @example
+     *
+     * _.max([4, 2, 8, 6]);
+     * // => 8
+     *
+     * var stooges = [
+     *   { 'name': 'moe', 'age': 40 },
+     *   { 'name': 'larry', 'age': 50 }
+     * ];
+     *
+     * _.max(stooges, function(stooge) { return stooge.age; });
+     * // => { 'name': 'larry', 'age': 50 };
+     *
+     * // using "_.pluck" callback shorthand
+     * _.max(stooges, 'age');
+     * // => { 'name': 'larry', 'age': 50 };
+     */
+    function max(collection, callback, thisArg) {
+      var computed = -Infinity,
+          result = computed;
+
+      if (!callback && isArray(collection)) {
+        var index = -1,
+            length = collection.length;
+
+        while (++index < length) {
+          var value = collection[index];
+          if (value > result) {
+            result = value;
+          }
+        }
+      } else {
+        callback = (!callback && isString(collection))
+          ? charAtCallback
+          : lodash.createCallback(callback, thisArg);
+
+        forEach(collection, function(value, index, collection) {
+          var current = callback(value, index, collection);
+          if (current > computed) {
+            computed = current;
+            result = value;
+          }
+        });
+      }
+      return result;
+    }
+
+    /**
+     * Retrieves the minimum value of an `array`. If `callback` is passed,
+     * it will be executed for each value in the `array` to generate the
+     * criterion by which the value is ranked. The `callback` is bound to `thisArg`
+     * and invoked with three arguments; (value, index, collection).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Mixed} Returns the minimum value.
+     * @example
+     *
+     * _.min([4, 2, 8, 6]);
+     * // => 2
+     *
+     * var stooges = [
+     *   { 'name': 'moe', 'age': 40 },
+     *   { 'name': 'larry', 'age': 50 }
+     * ];
+     *
+     * _.min(stooges, function(stooge) { return stooge.age; });
+     * // => { 'name': 'moe', 'age': 40 };
+     *
+     * // using "_.pluck" callback shorthand
+     * _.min(stooges, 'age');
+     * // => { 'name': 'moe', 'age': 40 };
+     */
+    function min(collection, callback, thisArg) {
+      var computed = Infinity,
+          result = computed;
+
+      if (!callback && isArray(collection)) {
+        var index = -1,
+            length = collection.length;
+
+        while (++index < length) {
+          var value = collection[index];
+          if (value < result) {
+            result = value;
+          }
+        }
+      } else {
+        callback = (!callback && isString(collection))
+          ? charAtCallback
+          : lodash.createCallback(callback, thisArg);
+
+        forEach(collection, function(value, index, collection) {
+          var current = callback(value, index, collection);
+          if (current < computed) {
+            computed = current;
+            result = value;
+          }
+        });
+      }
+      return result;
+    }
+
+    /**
+     * Retrieves the value of a specified property from all elements in the `collection`.
+     *
+     * @static
+     * @memberOf _
+     * @type Function
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {String} property The property to pluck.
+     * @returns {Array} Returns a new array of property values.
+     * @example
+     *
+     * var stooges = [
+     *   { 'name': 'moe', 'age': 40 },
+     *   { 'name': 'larry', 'age': 50 }
+     * ];
+     *
+     * _.pluck(stooges, 'name');
+     * // => ['moe', 'larry']
+     */
+    function pluck(collection, property) {
+      var index = -1,
+          length = collection ? collection.length : 0;
+
+      if (typeof length == 'number') {
+        var result = Array(length);
+        while (++index < length) {
+          result[index] = collection[index][property];
+        }
+      }
+      return result || map(collection, property);
+    }
+
+    /**
+     * Reduces a `collection` to a value which is the accumulated result of running
+     * each element in the `collection` through the `callback`, where each successive
+     * `callback` execution consumes the return value of the previous execution.
+     * If `accumulator` is not passed, the first element of the `collection` will be
+     * used as the initial `accumulator` value. The `callback` is bound to `thisArg`
+     * and invoked with four arguments; (accumulator, value, index|key, collection).
+     *
+     * @static
+     * @memberOf _
+     * @alias foldl, inject
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function} [callback=identity] The function called per iteration.
+     * @param {Mixed} [accumulator] Initial value of the accumulator.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Mixed} Returns the accumulated value.
+     * @example
+     *
+     * var sum = _.reduce([1, 2, 3], function(sum, num) {
+     *   return sum + num;
+     * });
+     * // => 6
+     *
+     * var mapped = _.reduce({ 'a': 1, 'b': 2, 'c': 3 }, function(result, num, key) {
+     *   result[key] = num * 3;
+     *   return result;
+     * }, {});
+     * // => { 'a': 3, 'b': 6, 'c': 9 }
+     */
+    function reduce(collection, callback, accumulator, thisArg) {
+      if (!collection) return accumulator;
+      var noaccum = arguments.length < 3;
+      callback = lodash.createCallback(callback, thisArg, 4);
+
+      var index = -1,
+          length = collection.length;
+
+      if (typeof length == 'number') {
+        if (noaccum) {
+          accumulator = collection[++index];
+        }
+        while (++index < length) {
+          accumulator = callback(accumulator, collection[index], index, collection);
+        }
+      } else {
+        forOwn(collection, function(value, index, collection) {
+          accumulator = noaccum
+            ? (noaccum = false, value)
+            : callback(accumulator, value, index, collection)
+        });
+      }
+      return accumulator;
+    }
+
+    /**
+     * This method is similar to `_.reduce`, except that it iterates over a
+     * `collection` from right to left.
+     *
+     * @static
+     * @memberOf _
+     * @alias foldr
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function} [callback=identity] The function called per iteration.
+     * @param {Mixed} [accumulator] Initial value of the accumulator.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Mixed} Returns the accumulated value.
+     * @example
+     *
+     * var list = [[0, 1], [2, 3], [4, 5]];
+     * var flat = _.reduceRight(list, function(a, b) { return a.concat(b); }, []);
+     * // => [4, 5, 2, 3, 0, 1]
+     */
+    function reduceRight(collection, callback, accumulator, thisArg) {
+      var iterable = collection,
+          length = collection ? collection.length : 0,
+          noaccum = arguments.length < 3;
+
+      if (typeof length != 'number') {
+        var props = keys(collection);
+        length = props.length;
+      }
+      callback = lodash.createCallback(callback, thisArg, 4);
+      forEach(collection, function(value, index, collection) {
+        index = props ? props[--length] : --length;
+        accumulator = noaccum
+          ? (noaccum = false, iterable[index])
+          : callback(accumulator, iterable[index], index, collection);
+      });
+      return accumulator;
+    }
+
+    /**
+     * The opposite of `_.filter`, this method returns the elements of a
+     * `collection` that `callback` does **not** return truthy for.
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Array} Returns a new array of elements that did **not** pass the
+     *  callback check.
+     * @example
+     *
+     * var odds = _.reject([1, 2, 3, 4, 5, 6], function(num) { return num % 2 == 0; });
+     * // => [1, 3, 5]
+     *
+     * var food = [
+     *   { 'name': 'apple',  'organic': false, 'type': 'fruit' },
+     *   { 'name': 'carrot', 'organic': true,  'type': 'vegetable' }
+     * ];
+     *
+     * // using "_.pluck" callback shorthand
+     * _.reject(food, 'organic');
+     * // => [{ 'name': 'apple', 'organic': false, 'type': 'fruit' }]
+     *
+     * // using "_.where" callback shorthand
+     * _.reject(food, { 'type': 'fruit' });
+     * // => [{ 'name': 'carrot', 'organic': true, 'type': 'vegetable' }]
+     */
+    function reject(collection, callback, thisArg) {
+      callback = lodash.createCallback(callback, thisArg);
+      return filter(collection, function(value, index, collection) {
+        return !callback(value, index, collection);
+      });
+    }
+
+    /**
+     * Creates an array of shuffled `array` values, using a version of the
+     * Fisher-Yates shuffle. See http://en.wikipedia.org/wiki/Fisher-Yates_shuffle.
+     *
+     * @static
+     * @memberOf _
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to shuffle.
+     * @returns {Array} Returns a new shuffled collection.
+     * @example
+     *
+     * _.shuffle([1, 2, 3, 4, 5, 6]);
+     * // => [4, 1, 6, 3, 5, 2]
+     */
+    function shuffle(collection) {
+      var index = -1,
+          length = collection ? collection.length : 0,
+          result = Array(typeof length == 'number' ? length : 0);
+
+      forEach(collection, function(value) {
+        var rand = floor(nativeRandom() * (++index + 1));
+        result[index] = result[rand];
+        result[rand] = value;
+      });
+      return result;
+    }
+
+    /**
+     * Gets the size of the `collection` by returning `collection.length` for arrays
+     * and array-like objects or the number of own enumerable properties for objects.
+     *
+     * @static
+     * @memberOf _
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to inspect.
+     * @returns {Number} Returns `collection.length` or number of own enumerable properties.
+     * @example
+     *
+     * _.size([1, 2]);
+     * // => 2
+     *
+     * _.size({ 'one': 1, 'two': 2, 'three': 3 });
+     * // => 3
+     *
+     * _.size('curly');
+     * // => 5
+     */
+    function size(collection) {
+      var length = collection ? collection.length : 0;
+      return typeof length == 'number' ? length : keys(collection).length;
+    }
+
+    /**
+     * Checks if the `callback` returns a truthy value for **any** element of a
+     * `collection`. The function returns as soon as it finds passing value, and
+     * does not iterate over the entire `collection`. The `callback` is bound to
+     * `thisArg` and invoked with three arguments; (value, index|key, collection).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @alias any
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Boolean} Returns `true` if any element passes the callback check,
+     *  else `false`.
+     * @example
+     *
+     * _.some([null, 0, 'yes', false], Boolean);
+     * // => true
+     *
+     * var food = [
+     *   { 'name': 'apple',  'organic': false, 'type': 'fruit' },
+     *   { 'name': 'carrot', 'organic': true,  'type': 'vegetable' }
+     * ];
+     *
+     * // using "_.pluck" callback shorthand
+     * _.some(food, 'organic');
+     * // => true
+     *
+     * // using "_.where" callback shorthand
+     * _.some(food, { 'type': 'meat' });
+     * // => false
+     */
+    function some(collection, callback, thisArg) {
+      var result;
+      callback = lodash.createCallback(callback, thisArg);
+
+      var index = -1,
+          length = collection ? collection.length : 0;
+
+      if (typeof length == 'number') {
+        while (++index < length) {
+          if ((result = callback(collection[index], index, collection))) {
+            break;
+          }
+        }
+      } else {
+        forOwn(collection, function(value, index, collection) {
+          return !(result = callback(value, index, collection));
+        });
+      }
+      return !!result;
+    }
+
+    /**
+     * Creates an array of elements, sorted in ascending order by the results of
+     * running each element in the `collection` through the `callback`. This method
+     * performs a stable sort, that is, it will preserve the original sort order of
+     * equal elements. The `callback` is bound to `thisArg` and invoked with three
+     * arguments; (value, index|key, collection).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Array} Returns a new array of sorted elements.
+     * @example
+     *
+     * _.sortBy([1, 2, 3], function(num) { return Math.sin(num); });
+     * // => [3, 1, 2]
+     *
+     * _.sortBy([1, 2, 3], function(num) { return this.sin(num); }, Math);
+     * // => [3, 1, 2]
+     *
+     * // using "_.pluck" callback shorthand
+     * _.sortBy(['banana', 'strawberry', 'apple'], 'length');
+     * // => ['apple', 'banana', 'strawberry']
+     */
+    function sortBy(collection, callback, thisArg) {
+      var index = -1,
+          length = collection ? collection.length : 0,
+          result = Array(typeof length == 'number' ? length : 0);
+
+      callback = lodash.createCallback(callback, thisArg);
+      forEach(collection, function(value, key, collection) {
+        var object = result[++index] = getObject();
+        object.criteria = callback(value, key, collection);
+        object.index = index;
+        object.value = value;
+      });
+
+      length = result.length;
+      result.sort(compareAscending);
+      while (length--) {
+        var object = result[length];
+        result[length] = object.value;
+        releaseObject(object);
+      }
+      return result;
+    }
+
+    /**
+     * Converts the `collection` to an array.
+     *
+     * @static
+     * @memberOf _
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to convert.
+     * @returns {Array} Returns the new converted array.
+     * @example
+     *
+     * (function() { return _.toArray(arguments).slice(1); })(1, 2, 3, 4);
+     * // => [2, 3, 4]
+     */
+    function toArray(collection) {
+      if (collection && typeof collection.length == 'number') {
+        return slice(collection);
+      }
+      return values(collection);
+    }
+
+    /**
+     * Examines each element in a `collection`, returning an array of all elements
+     * that have the given `properties`. When checking `properties`, this method
+     * performs a deep comparison between values to determine if they are equivalent
+     * to each other.
+     *
+     * @static
+     * @memberOf _
+     * @type Function
+     * @category Collections
+     * @param {Array|Object|String} collection The collection to iterate over.
+     * @param {Object} properties The object of property values to filter by.
+     * @returns {Array} Returns a new array of elements that have the given `properties`.
+     * @example
+     *
+     * var stooges = [
+     *   { 'name': 'moe', 'age': 40 },
+     *   { 'name': 'larry', 'age': 50 }
+     * ];
+     *
+     * _.where(stooges, { 'age': 40 });
+     * // => [{ 'name': 'moe', 'age': 40 }]
+     */
+    var where = filter;
+
+    /*--------------------------------------------------------------------------*/
+
+    /**
+     * Creates an array with all falsey values of `array` removed. The values
+     * `false`, `null`, `0`, `""`, `undefined` and `NaN` are all falsey.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} array The array to compact.
+     * @returns {Array} Returns a new filtered array.
+     * @example
+     *
+     * _.compact([0, 1, false, 2, '', 3]);
+     * // => [1, 2, 3]
+     */
+    function compact(array) {
+      var index = -1,
+          length = array ? array.length : 0,
+          result = [];
+
+      while (++index < length) {
+        var value = array[index];
+        if (value) {
+          result.push(value);
+        }
+      }
+      return result;
+    }
+
+    /**
+     * Creates an array of `array` elements not present in the other arrays
+     * using strict equality for comparisons, i.e. `===`.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} array The array to process.
+     * @param {Array} [array1, array2, ...] Arrays to check.
+     * @returns {Array} Returns a new array of `array` elements not present in the
+     *  other arrays.
+     * @example
+     *
+     * _.difference([1, 2, 3, 4, 5], [5, 2, 10]);
+     * // => [1, 3, 4]
+     */
+    function difference(array) {
+      var index = -1,
+          indexOf = getIndexOf(),
+          length = array ? array.length : 0,
+          seen = concat.apply(arrayRef, nativeSlice.call(arguments, 1)),
+          result = [];
+
+      var isLarge = length >= largeArraySize && indexOf === basicIndexOf;
+
+      if (isLarge) {
+        var cache = createCache(seen);
+        if (cache) {
+          indexOf = cacheIndexOf;
+          seen = cache;
+        } else {
+          isLarge = false;
+        }
+      }
+      while (++index < length) {
+        var value = array[index];
+        if (indexOf(seen, value) < 0) {
+          result.push(value);
+        }
+      }
+      if (isLarge) {
+        releaseObject(seen);
+      }
+      return result;
+    }
+
+    /**
+     * This method is similar to `_.find`, except that it returns the index of
+     * the element that passes the callback check, instead of the element itself.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} array The array to search.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Mixed} Returns the index of the found element, else `-1`.
+     * @example
+     *
+     * _.findIndex(['apple', 'banana', 'beet'], function(food) {
+     *   return /^b/.test(food);
+     * });
+     * // => 1
+     */
+    function findIndex(array, callback, thisArg) {
+      var index = -1,
+          length = array ? array.length : 0;
+
+      callback = lodash.createCallback(callback, thisArg);
+      while (++index < length) {
+        if (callback(array[index], index, array)) {
+          return index;
+        }
+      }
+      return -1;
+    }
+
+    /**
+     * Gets the first element of the `array`. If a number `n` is passed, the first
+     * `n` elements of the `array` are returned. If a `callback` function is passed,
+     * elements at the beginning of the array are returned as long as the `callback`
+     * returns truthy. The `callback` is bound to `thisArg` and invoked with three
+     * arguments; (value, index, array).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @alias head, take
+     * @category Arrays
+     * @param {Array} array The array to query.
+     * @param {Function|Object|Number|String} [callback|n] The function called
+     *  per element or the number of elements to return. If a property name or
+     *  object is passed, it will be used to create a "_.pluck" or "_.where"
+     *  style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Mixed} Returns the first element(s) of `array`.
+     * @example
+     *
+     * _.first([1, 2, 3]);
+     * // => 1
+     *
+     * _.first([1, 2, 3], 2);
+     * // => [1, 2]
+     *
+     * _.first([1, 2, 3], function(num) {
+     *   return num < 3;
+     * });
+     * // => [1, 2]
+     *
+     * var food = [
+     *   { 'name': 'banana', 'organic': true },
+     *   { 'name': 'beet',   'organic': false },
+     * ];
+     *
+     * // using "_.pluck" callback shorthand
+     * _.first(food, 'organic');
+     * // => [{ 'name': 'banana', 'organic': true }]
+     *
+     * var food = [
+     *   { 'name': 'apple',  'type': 'fruit' },
+     *   { 'name': 'banana', 'type': 'fruit' },
+     *   { 'name': 'beet',   'type': 'vegetable' }
+     * ];
+     *
+     * // using "_.where" callback shorthand
+     * _.first(food, { 'type': 'fruit' });
+     * // => [{ 'name': 'apple', 'type': 'fruit' }, { 'name': 'banana', 'type': 'fruit' }]
+     */
+    function first(array, callback, thisArg) {
+      if (array) {
+        var n = 0,
+            length = array.length;
+
+        if (typeof callback != 'number' && callback != null) {
+          var index = -1;
+          callback = lodash.createCallback(callback, thisArg);
+          while (++index < length && callback(array[index], index, array)) {
+            n++;
+          }
+        } else {
+          n = callback;
+          if (n == null || thisArg) {
+            return array[0];
+          }
+        }
+        return slice(array, 0, nativeMin(nativeMax(0, n), length));
+      }
+    }
+
+    /**
+     * Flattens a nested array (the nesting can be to any depth). If `isShallow`
+     * is truthy, `array` will only be flattened a single level. If `callback`
+     * is passed, each element of `array` is passed through a `callback` before
+     * flattening. The `callback` is bound to `thisArg` and invoked with three
+     * arguments; (value, index, array).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} array The array to flatten.
+     * @param {Boolean} [isShallow=false] A flag to indicate only flattening a single level.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Array} Returns a new flattened array.
+     * @example
+     *
+     * _.flatten([1, [2], [3, [[4]]]]);
+     * // => [1, 2, 3, 4];
+     *
+     * _.flatten([1, [2], [3, [[4]]]], true);
+     * // => [1, 2, 3, [[4]]];
+     *
+     * var stooges = [
+     *   { 'name': 'curly', 'quotes': ['Oh, a wise guy, eh?', 'Poifect!'] },
+     *   { 'name': 'moe', 'quotes': ['Spread out!', 'You knucklehead!'] }
+     * ];
+     *
+     * // using "_.pluck" callback shorthand
+     * _.flatten(stooges, 'quotes');
+     * // => ['Oh, a wise guy, eh?', 'Poifect!', 'Spread out!', 'You knucklehead!']
+     */
+    var flatten = overloadWrapper(function flatten(array, isShallow, callback) {
+      var index = -1,
+          length = array ? array.length : 0,
+          result = [];
+
+      while (++index < length) {
+        var value = array[index];
+        if (callback) {
+          value = callback(value, index, array);
+        }
+        // recursively flatten arrays (susceptible to call stack limits)
+        if (isArray(value)) {
+          push.apply(result, isShallow ? value : flatten(value));
+        } else {
+          result.push(value);
+        }
+      }
+      return result;
+    });
+
+    /**
+     * Gets the index at which the first occurrence of `value` is found using
+     * strict equality for comparisons, i.e. `===`. If the `array` is already
+     * sorted, passing `true` for `fromIndex` will run a faster binary search.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} array The array to search.
+     * @param {Mixed} value The value to search for.
+     * @param {Boolean|Number} [fromIndex=0] The index to search from or `true` to
+     *  perform a binary search on a sorted `array`.
+     * @returns {Number} Returns the index of the matched value or `-1`.
+     * @example
+     *
+     * _.indexOf([1, 2, 3, 1, 2, 3], 2);
+     * // => 1
+     *
+     * _.indexOf([1, 2, 3, 1, 2, 3], 2, 3);
+     * // => 4
+     *
+     * _.indexOf([1, 1, 2, 2, 3, 3], 2, true);
+     * // => 2
+     */
+    function indexOf(array, value, fromIndex) {
+      if (typeof fromIndex == 'number') {
+        var length = array ? array.length : 0;
+        fromIndex = (fromIndex < 0 ? nativeMax(0, length + fromIndex) : fromIndex || 0);
+      } else if (fromIndex) {
+        var index = sortedIndex(array, value);
+        return array[index] === value ? index : -1;
+      }
+      return array ? basicIndexOf(array, value, fromIndex) : -1;
+    }
+
+    /**
+     * Gets all but the last element of `array`. If a number `n` is passed, the
+     * last `n` elements are excluded from the result. If a `callback` function
+     * is passed, elements at the end of the array are excluded from the result
+     * as long as the `callback` returns truthy. The `callback` is bound to
+     * `thisArg` and invoked with three arguments; (value, index, array).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} array The array to query.
+     * @param {Function|Object|Number|String} [callback|n=1] The function called
+     *  per element or the number of elements to exclude. If a property name or
+     *  object is passed, it will be used to create a "_.pluck" or "_.where"
+     *  style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Array} Returns a slice of `array`.
+     * @example
+     *
+     * _.initial([1, 2, 3]);
+     * // => [1, 2]
+     *
+     * _.initial([1, 2, 3], 2);
+     * // => [1]
+     *
+     * _.initial([1, 2, 3], function(num) {
+     *   return num > 1;
+     * });
+     * // => [1]
+     *
+     * var food = [
+     *   { 'name': 'beet',   'organic': false },
+     *   { 'name': 'carrot', 'organic': true }
+     * ];
+     *
+     * // using "_.pluck" callback shorthand
+     * _.initial(food, 'organic');
+     * // => [{ 'name': 'beet',   'organic': false }]
+     *
+     * var food = [
+     *   { 'name': 'banana', 'type': 'fruit' },
+     *   { 'name': 'beet',   'type': 'vegetable' },
+     *   { 'name': 'carrot', 'type': 'vegetable' }
+     * ];
+     *
+     * // using "_.where" callback shorthand
+     * _.initial(food, { 'type': 'vegetable' });
+     * // => [{ 'name': 'banana', 'type': 'fruit' }]
+     */
+    function initial(array, callback, thisArg) {
+      if (!array) {
+        return [];
+      }
+      var n = 0,
+          length = array.length;
+
+      if (typeof callback != 'number' && callback != null) {
+        var index = length;
+        callback = lodash.createCallback(callback, thisArg);
+        while (index-- && callback(array[index], index, array)) {
+          n++;
+        }
+      } else {
+        n = (callback == null || thisArg) ? 1 : callback || n;
+      }
+      return slice(array, 0, nativeMin(nativeMax(0, length - n), length));
+    }
+
+    /**
+     * Computes the intersection of all the passed-in arrays using strict equality
+     * for comparisons, i.e. `===`.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} [array1, array2, ...] Arrays to process.
+     * @returns {Array} Returns a new array of unique elements that are present
+     *  in **all** of the arrays.
+     * @example
+     *
+     * _.intersection([1, 2, 3], [101, 2, 1, 10], [2, 1]);
+     * // => [1, 2]
+     */
+    function intersection(array) {
+      var args = arguments,
+          argsLength = args.length,
+          argsIndex = -1,
+          caches = getArray(),
+          index = -1,
+          indexOf = getIndexOf(),
+          length = array ? array.length : 0,
+          result = [],
+          seen = getArray();
+
+      while (++argsIndex < argsLength) {
+        var value = args[argsIndex];
+        caches[argsIndex] = indexOf === basicIndexOf &&
+          (value ? value.length : 0) >= largeArraySize &&
+          createCache(argsIndex ? args[argsIndex] : seen);
+      }
+      outer:
+      while (++index < length) {
+        var cache = caches[0];
+        value = array[index];
+
+        if ((cache ? cacheIndexOf(cache, value) : indexOf(seen, value)) < 0) {
+          argsIndex = argsLength;
+          (cache || seen).push(value);
+          while (--argsIndex) {
+            cache = caches[argsIndex];
+            if ((cache ? cacheIndexOf(cache, value) : indexOf(args[argsIndex], value)) < 0) {
+              continue outer;
+            }
+          }
+          result.push(value);
+        }
+      }
+      while (argsLength--) {
+        cache = caches[argsLength];
+        if (cache) {
+          releaseObject(cache);
+        }
+      }
+      releaseArray(caches);
+      releaseArray(seen);
+      return result;
+    }
+
+    /**
+     * Gets the last element of the `array`. If a number `n` is passed, the
+     * last `n` elements of the `array` are returned. If a `callback` function
+     * is passed, elements at the end of the array are returned as long as the
+     * `callback` returns truthy. The `callback` is bound to `thisArg` and
+     * invoked with three arguments;(value, index, array).
+     *
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} array The array to query.
+     * @param {Function|Object|Number|String} [callback|n] The function called
+     *  per element or the number of elements to return. If a property name or
+     *  object is passed, it will be used to create a "_.pluck" or "_.where"
+     *  style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Mixed} Returns the last element(s) of `array`.
+     * @example
+     *
+     * _.last([1, 2, 3]);
+     * // => 3
+     *
+     * _.last([1, 2, 3], 2);
+     * // => [2, 3]
+     *
+     * _.last([1, 2, 3], function(num) {
+     *   return num > 1;
+     * });
+     * // => [2, 3]
+     *
+     * var food = [
+     *   { 'name': 'beet',   'organic': false },
+     *   { 'name': 'carrot', 'organic': true }
+     * ];
+     *
+     * // using "_.pluck" callback shorthand
+     * _.last(food, 'organic');
+     * // => [{ 'name': 'carrot', 'organic': true }]
+     *
+     * var food = [
+     *   { 'name': 'banana', 'type': 'fruit' },
+     *   { 'name': 'beet',   'type': 'vegetable' },
+     *   { 'name': 'carrot', 'type': 'vegetable' }
+     * ];
+     *
+     * // using "_.where" callback shorthand
+     * _.last(food, { 'type': 'vegetable' });
+     * // => [{ 'name': 'beet', 'type': 'vegetable' }, { 'name': 'carrot', 'type': 'vegetable' }]
+     */
+    function last(array, callback, thisArg) {
+      if (array) {
+        var n = 0,
+            length = array.length;
+
+        if (typeof callback != 'number' && callback != null) {
+          var index = length;
+          callback = lodash.createCallback(callback, thisArg);
+          while (index-- && callback(array[index], index, array)) {
+            n++;
+          }
+        } else {
+          n = callback;
+          if (n == null || thisArg) {
+            return array[length - 1];
+          }
+        }
+        return slice(array, nativeMax(0, length - n));
+      }
+    }
+
+    /**
+     * Gets the index at which the last occurrence of `value` is found using strict
+     * equality for comparisons, i.e. `===`. If `fromIndex` is negative, it is used
+     * as the offset from the end of the collection.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} array The array to search.
+     * @param {Mixed} value The value to search for.
+     * @param {Number} [fromIndex=array.length-1] The index to search from.
+     * @returns {Number} Returns the index of the matched value or `-1`.
+     * @example
+     *
+     * _.lastIndexOf([1, 2, 3, 1, 2, 3], 2);
+     * // => 4
+     *
+     * _.lastIndexOf([1, 2, 3, 1, 2, 3], 2, 3);
+     * // => 1
+     */
+    function lastIndexOf(array, value, fromIndex) {
+      var index = array ? array.length : 0;
+      if (typeof fromIndex == 'number') {
+        index = (fromIndex < 0 ? nativeMax(0, index + fromIndex) : nativeMin(fromIndex, index - 1)) + 1;
+      }
+      while (index--) {
+        if (array[index] === value) {
+          return index;
+        }
+      }
+      return -1;
+    }
+
+    /**
+     * Creates an array of numbers (positive and/or negative) progressing from
+     * `start` up to but not including `end`.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Number} [start=0] The start of the range.
+     * @param {Number} end The end of the range.
+     * @param {Number} [step=1] The value to increment or decrement by.
+     * @returns {Array} Returns a new range array.
+     * @example
+     *
+     * _.range(10);
+     * // => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+     *
+     * _.range(1, 11);
+     * // => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+     *
+     * _.range(0, 30, 5);
+     * // => [0, 5, 10, 15, 20, 25]
+     *
+     * _.range(0, -10, -1);
+     * // => [0, -1, -2, -3, -4, -5, -6, -7, -8, -9]
+     *
+     * _.range(0);
+     * // => []
+     */
+    function range(start, end, step) {
+      start = +start || 0;
+      step = +step || 1;
+
+      if (end == null) {
+        end = start;
+        start = 0;
+      }
+      // use `Array(length)` so V8 will avoid the slower "dictionary" mode
+      // http://youtu.be/XAqIpGU8ZZk#t=17m25s
+      var index = -1,
+          length = nativeMax(0, ceil((end - start) / step)),
+          result = Array(length);
+
+      while (++index < length) {
+        result[index] = start;
+        start += step;
+      }
+      return result;
+    }
+
+    /**
+     * The opposite of `_.initial`, this method gets all but the first value of
+     * `array`. If a number `n` is passed, the first `n` values are excluded from
+     * the result. If a `callback` function is passed, elements at the beginning
+     * of the array are excluded from the result as long as the `callback` returns
+     * truthy. The `callback` is bound to `thisArg` and invoked with three
+     * arguments; (value, index, array).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @alias drop, tail
+     * @category Arrays
+     * @param {Array} array The array to query.
+     * @param {Function|Object|Number|String} [callback|n=1] The function called
+     *  per element or the number of elements to exclude. If a property name or
+     *  object is passed, it will be used to create a "_.pluck" or "_.where"
+     *  style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Array} Returns a slice of `array`.
+     * @example
+     *
+     * _.rest([1, 2, 3]);
+     * // => [2, 3]
+     *
+     * _.rest([1, 2, 3], 2);
+     * // => [3]
+     *
+     * _.rest([1, 2, 3], function(num) {
+     *   return num < 3;
+     * });
+     * // => [3]
+     *
+     * var food = [
+     *   { 'name': 'banana', 'organic': true },
+     *   { 'name': 'beet',   'organic': false },
+     * ];
+     *
+     * // using "_.pluck" callback shorthand
+     * _.rest(food, 'organic');
+     * // => [{ 'name': 'beet', 'organic': false }]
+     *
+     * var food = [
+     *   { 'name': 'apple',  'type': 'fruit' },
+     *   { 'name': 'banana', 'type': 'fruit' },
+     *   { 'name': 'beet',   'type': 'vegetable' }
+     * ];
+     *
+     * // using "_.where" callback shorthand
+     * _.rest(food, { 'type': 'fruit' });
+     * // => [{ 'name': 'beet', 'type': 'vegetable' }]
+     */
+    function rest(array, callback, thisArg) {
+      if (typeof callback != 'number' && callback != null) {
+        var n = 0,
+            index = -1,
+            length = array ? array.length : 0;
+
+        callback = lodash.createCallback(callback, thisArg);
+        while (++index < length && callback(array[index], index, array)) {
+          n++;
+        }
+      } else {
+        n = (callback == null || thisArg) ? 1 : nativeMax(0, callback);
+      }
+      return slice(array, n);
+    }
+
+    /**
+     * Uses a binary search to determine the smallest index at which the `value`
+     * should be inserted into `array` in order to maintain the sort order of the
+     * sorted `array`. If `callback` is passed, it will be executed for `value` and
+     * each element in `array` to compute their sort ranking. The `callback` is
+     * bound to `thisArg` and invoked with one argument; (value).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} array The array to inspect.
+     * @param {Mixed} value The value to evaluate.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Number} Returns the index at which the value should be inserted
+     *  into `array`.
+     * @example
+     *
+     * _.sortedIndex([20, 30, 50], 40);
+     * // => 2
+     *
+     * // using "_.pluck" callback shorthand
+     * _.sortedIndex([{ 'x': 20 }, { 'x': 30 }, { 'x': 50 }], { 'x': 40 }, 'x');
+     * // => 2
+     *
+     * var dict = {
+     *   'wordToNumber': { 'twenty': 20, 'thirty': 30, 'fourty': 40, 'fifty': 50 }
+     * };
+     *
+     * _.sortedIndex(['twenty', 'thirty', 'fifty'], 'fourty', function(word) {
+     *   return dict.wordToNumber[word];
+     * });
+     * // => 2
+     *
+     * _.sortedIndex(['twenty', 'thirty', 'fifty'], 'fourty', function(word) {
+     *   return this.wordToNumber[word];
+     * }, dict);
+     * // => 2
+     */
+    function sortedIndex(array, value, callback, thisArg) {
+      var low = 0,
+          high = array ? array.length : low;
+
+      // explicitly reference `identity` for better inlining in Firefox
+      callback = callback ? lodash.createCallback(callback, thisArg, 1) : identity;
+      value = callback(value);
+
+      while (low < high) {
+        var mid = (low + high) >>> 1;
+        (callback(array[mid]) < value)
+          ? low = mid + 1
+          : high = mid;
+      }
+      return low;
+    }
+
+    /**
+     * Computes the union of the passed-in arrays using strict equality for
+     * comparisons, i.e. `===`.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} [array1, array2, ...] Arrays to process.
+     * @returns {Array} Returns a new array of unique values, in order, that are
+     *  present in one or more of the arrays.
+     * @example
+     *
+     * _.union([1, 2, 3], [101, 2, 1, 10], [2, 1]);
+     * // => [1, 2, 3, 101, 10]
+     */
+    function union(array) {
+      if (!isArray(array)) {
+        arguments[0] = array ? nativeSlice.call(array) : arrayRef;
+      }
+      return uniq(concat.apply(arrayRef, arguments));
+    }
+
+    /**
+     * Creates a duplicate-value-free version of the `array` using strict equality
+     * for comparisons, i.e. `===`. If the `array` is already sorted, passing `true`
+     * for `isSorted` will run a faster algorithm. If `callback` is passed, each
+     * element of `array` is passed through the `callback` before uniqueness is computed.
+     * The `callback` is bound to `thisArg` and invoked with three arguments; (value, index, array).
+     *
+     * If a property name is passed for `callback`, the created "_.pluck" style
+     * callback will return the property value of the given element.
+     *
+     * If an object is passed for `callback`, the created "_.where" style callback
+     * will return `true` for elements that have the properties of the given object,
+     * else `false`.
+     *
+     * @static
+     * @memberOf _
+     * @alias unique
+     * @category Arrays
+     * @param {Array} array The array to process.
+     * @param {Boolean} [isSorted=false] A flag to indicate that the `array` is already sorted.
+     * @param {Function|Object|String} [callback=identity] The function called per
+     *  iteration. If a property name or object is passed, it will be used to create
+     *  a "_.pluck" or "_.where" style callback, respectively.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Array} Returns a duplicate-value-free array.
+     * @example
+     *
+     * _.uniq([1, 2, 1, 3, 1]);
+     * // => [1, 2, 3]
+     *
+     * _.uniq([1, 1, 2, 2, 3], true);
+     * // => [1, 2, 3]
+     *
+     * _.uniq(['A', 'b', 'C', 'a', 'B', 'c'], function(letter) { return letter.toLowerCase(); });
+     * // => ['A', 'b', 'C']
+     *
+     * _.uniq([1, 2.5, 3, 1.5, 2, 3.5], function(num) { return this.floor(num); }, Math);
+     * // => [1, 2.5, 3]
+     *
+     * // using "_.pluck" callback shorthand
+     * _.uniq([{ 'x': 1 }, { 'x': 2 }, { 'x': 1 }], 'x');
+     * // => [{ 'x': 1 }, { 'x': 2 }]
+     */
+    var uniq = overloadWrapper(function(array, isSorted, callback) {
+      var index = -1,
+          indexOf = getIndexOf(),
+          length = array ? array.length : 0,
+          result = [];
+
+      var isLarge = !isSorted && length >= largeArraySize && indexOf === basicIndexOf,
+          seen = (callback || isLarge) ? getArray() : result;
+
+      if (isLarge) {
+        var cache = createCache(seen);
+        if (cache) {
+          indexOf = cacheIndexOf;
+          seen = cache;
+        } else {
+          isLarge = false;
+          seen = callback ? seen : (releaseArray(seen), result);
+        }
+      }
+      while (++index < length) {
+        var value = array[index],
+            computed = callback ? callback(value, index, array) : value;
+
+        if (isSorted
+              ? !index || seen[seen.length - 1] !== computed
+              : indexOf(seen, computed) < 0
+            ) {
+          if (callback || isLarge) {
+            seen.push(computed);
+          }
+          result.push(value);
+        }
+      }
+      if (isLarge) {
+        releaseArray(seen.array);
+        releaseObject(seen);
+      } else if (callback) {
+        releaseArray(seen);
+      }
+      return result;
+    });
+
+    /**
+     * The inverse of `_.zip`, this method splits groups of elements into arrays
+     * composed of elements from each group at their corresponding indexes.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} array The array to process.
+     * @returns {Array} Returns a new array of the composed arrays.
+     * @example
+     *
+     * _.unzip([['moe', 30, true], ['larry', 40, false]]);
+     * // => [['moe', 'larry'], [30, 40], [true, false]];
+     */
+    function unzip(array) {
+      var index = -1,
+          length = array ? max(pluck(array, 'length')) : 0,
+          result = Array(length < 0 ? 0 : length);
+
+      while (++index < length) {
+        result[index] = pluck(array, index);
+      }
+      return result;
+    }
+
+    /**
+     * Creates an array with all occurrences of the passed values removed using
+     * strict equality for comparisons, i.e. `===`.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} array The array to filter.
+     * @param {Mixed} [value1, value2, ...] Values to remove.
+     * @returns {Array} Returns a new filtered array.
+     * @example
+     *
+     * _.without([1, 2, 1, 0, 3, 1, 4], 0, 1);
+     * // => [2, 3, 4]
+     */
+    function without(array) {
+      return difference(array, nativeSlice.call(arguments, 1));
+    }
+
+    /**
+     * Groups the elements of each array at their corresponding indexes. Useful for
+     * separate data sources that are coordinated through matching array indexes.
+     * For a matrix of nested arrays, `_.zip.apply(...)` can transpose the matrix
+     * in a similar fashion.
+     *
+     * @static
+     * @memberOf _
+     * @category Arrays
+     * @param {Array} [array1, array2, ...] Arrays to process.
+     * @returns {Array} Returns a new array of grouped elements.
+     * @example
+     *
+     * _.zip(['moe', 'larry'], [30, 40], [true, false]);
+     * // => [['moe', 30, true], ['larry', 40, false]]
+     */
+    function zip(array) {
+      return array ? unzip(arguments) : [];
+    }
+
+    /**
+     * Creates an object composed from arrays of `keys` and `values`. Pass either
+     * a single two dimensional array, i.e. `[[key1, value1], [key2, value2]]`, or
+     * two arrays, one of `keys` and one of corresponding `values`.
+     *
+     * @static
+     * @memberOf _
+     * @alias object
+     * @category Arrays
+     * @param {Array} keys The array of keys.
+     * @param {Array} [values=[]] The array of values.
+     * @returns {Object} Returns an object composed of the given keys and
+     *  corresponding values.
+     * @example
+     *
+     * _.zipObject(['moe', 'larry'], [30, 40]);
+     * // => { 'moe': 30, 'larry': 40 }
+     */
+    function zipObject(keys, values) {
+      var index = -1,
+          length = keys ? keys.length : 0,
+          result = {};
+
+      while (++index < length) {
+        var key = keys[index];
+        if (values) {
+          result[key] = values[index];
+        } else {
+          result[key[0]] = key[1];
+        }
+      }
+      return result;
+    }
+
+    /*--------------------------------------------------------------------------*/
+
+    /**
+     * If `n` is greater than `0`, a function is created that is restricted to
+     * executing `func`, with the `this` binding and arguments of the created
+     * function, only after it is called `n` times. If `n` is less than `1`,
+     * `func` is executed immediately, without a `this` binding or additional
+     * arguments, and its result is returned.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Number} n The number of times the function must be called before
+     * it is executed.
+     * @param {Function} func The function to restrict.
+     * @returns {Function} Returns the new restricted function.
+     * @example
+     *
+     * var renderNotes = _.after(notes.length, render);
+     * _.forEach(notes, function(note) {
+     *   note.asyncSave({ 'success': renderNotes });
+     * });
+     * // `renderNotes` is run once, after all notes have saved
+     */
+    function after(n, func) {
+      if (n < 1) {
+        return func();
+      }
+      return function() {
+        if (--n < 1) {
+          return func.apply(this, arguments);
+        }
+      };
+    }
+
+    /**
+     * Creates a function that, when called, invokes `func` with the `this`
+     * binding of `thisArg` and prepends any additional `bind` arguments to those
+     * passed to the bound function.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Function} func The function to bind.
+     * @param {Mixed} [thisArg] The `this` binding of `func`.
+     * @param {Mixed} [arg1, arg2, ...] Arguments to be partially applied.
+     * @returns {Function} Returns the new bound function.
+     * @example
+     *
+     * var func = function(greeting) {
+     *   return greeting + ' ' + this.name;
+     * };
+     *
+     * func = _.bind(func, { 'name': 'moe' }, 'hi');
+     * func();
+     * // => 'hi moe'
+     */
+    function bind(func, thisArg) {
+      // use `Function#bind` if it exists and is fast
+      // (in V8 `Function#bind` is slower except when partially applied)
+      return support.fastBind || (nativeBind && arguments.length > 2)
+        ? nativeBind.call.apply(nativeBind, arguments)
+        : createBound(func, thisArg, nativeSlice.call(arguments, 2));
+    }
+
+    /**
+     * Binds methods on `object` to `object`, overwriting the existing method.
+     * Method names may be specified as individual arguments or as arrays of method
+     * names. If no method names are provided, all the function properties of `object`
+     * will be bound.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Object} object The object to bind and assign the bound methods to.
+     * @param {String} [methodName1, methodName2, ...] Method names on the object to bind.
+     * @returns {Object} Returns `object`.
+     * @example
+     *
+     * var view = {
+     *  'label': 'docs',
+     *  'onClick': function() { alert('clicked ' + this.label); }
+     * };
+     *
+     * _.bindAll(view);
+     * jQuery('#docs').on('click', view.onClick);
+     * // => alerts 'clicked docs', when the button is clicked
+     */
+    function bindAll(object) {
+      var funcs = arguments.length > 1 ? concat.apply(arrayRef, nativeSlice.call(arguments, 1)) : functions(object),
+          index = -1,
+          length = funcs.length;
+
+      while (++index < length) {
+        var key = funcs[index];
+        object[key] = bind(object[key], object);
+      }
+      return object;
+    }
+
+    /**
+     * Creates a function that, when called, invokes the method at `object[key]`
+     * and prepends any additional `bindKey` arguments to those passed to the bound
+     * function. This method differs from `_.bind` by allowing bound functions to
+     * reference methods that will be redefined or don't yet exist.
+     * See http://michaux.ca/articles/lazy-function-definition-pattern.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Object} object The object the method belongs to.
+     * @param {String} key The key of the method.
+     * @param {Mixed} [arg1, arg2, ...] Arguments to be partially applied.
+     * @returns {Function} Returns the new bound function.
+     * @example
+     *
+     * var object = {
+     *   'name': 'moe',
+     *   'greet': function(greeting) {
+     *     return greeting + ' ' + this.name;
+     *   }
+     * };
+     *
+     * var func = _.bindKey(object, 'greet', 'hi');
+     * func();
+     * // => 'hi moe'
+     *
+     * object.greet = function(greeting) {
+     *   return greeting + ', ' + this.name + '!';
+     * };
+     *
+     * func();
+     * // => 'hi, moe!'
+     */
+    function bindKey(object, key) {
+      return createBound(object, key, nativeSlice.call(arguments, 2), indicatorObject);
+    }
+
+    /**
+     * Creates a function that is the composition of the passed functions,
+     * where each function consumes the return value of the function that follows.
+     * For example, composing the functions `f()`, `g()`, and `h()` produces `f(g(h()))`.
+     * Each function is executed with the `this` binding of the composed function.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Function} [func1, func2, ...] Functions to compose.
+     * @returns {Function} Returns the new composed function.
+     * @example
+     *
+     * var greet = function(name) { return 'hi ' + name; };
+     * var exclaim = function(statement) { return statement + '!'; };
+     * var welcome = _.compose(exclaim, greet);
+     * welcome('moe');
+     * // => 'hi moe!'
+     */
+    function compose() {
+      var funcs = arguments;
+      return function() {
+        var args = arguments,
+            length = funcs.length;
+
+        while (length--) {
+          args = [funcs[length].apply(this, args)];
+        }
+        return args[0];
+      };
+    }
+
+    /**
+     * Produces a callback bound to an optional `thisArg`. If `func` is a property
+     * name, the created callback will return the property value for a given element.
+     * If `func` is an object, the created callback will return `true` for elements
+     * that contain the equivalent object properties, otherwise it will return `false`.
+     *
+     * Note: All Lo-Dash methods, that accept a `callback` argument, use `_.createCallback`.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Mixed} [func=identity] The value to convert to a callback.
+     * @param {Mixed} [thisArg] The `this` binding of the created callback.
+     * @param {Number} [argCount=3] The number of arguments the callback accepts.
+     * @returns {Function} Returns a callback function.
+     * @example
+     *
+     * var stooges = [
+     *   { 'name': 'moe', 'age': 40 },
+     *   { 'name': 'larry', 'age': 50 }
+     * ];
+     *
+     * // wrap to create custom callback shorthands
+     * _.createCallback = _.wrap(_.createCallback, function(func, callback, thisArg) {
+     *   var match = /^(.+?)__([gl]t)(.+)$/.exec(callback);
+     *   return !match ? func(callback, thisArg) : function(object) {
+     *     return match[2] == 'gt' ? object[match[1]] > match[3] : object[match[1]] < match[3];
+     *   };
+     * });
+     *
+     * _.filter(stooges, 'age__gt45');
+     * // => [{ 'name': 'larry', 'age': 50 }]
+     *
+     * // create mixins with support for "_.pluck" and "_.where" callback shorthands
+     * _.mixin({
+     *   'toLookup': function(collection, callback, thisArg) {
+     *     callback = _.createCallback(callback, thisArg);
+     *     return _.reduce(collection, function(result, value, index, collection) {
+     *       return (result[callback(value, index, collection)] = value, result);
+     *     }, {});
+     *   }
+     * });
+     *
+     * _.toLookup(stooges, 'name');
+     * // => { 'moe': { 'name': 'moe', 'age': 40 }, 'larry': { 'name': 'larry', 'age': 50 } }
+     */
+    function createCallback(func, thisArg, argCount) {
+      if (func == null) {
+        return identity;
+      }
+      var type = typeof func;
+      if (type != 'function') {
+        if (type != 'object') {
+          return function(object) {
+            return object[func];
+          };
+        }
+        var props = keys(func);
+        return function(object) {
+          var length = props.length,
+              result = false;
+          while (length--) {
+            if (!(result = isEqual(object[props[length]], func[props[length]], indicatorObject))) {
+              break;
+            }
+          }
+          return result;
+        };
+      }
+      if (typeof thisArg == 'undefined' || (reThis && !reThis.test(fnToString.call(func)))) {
+        return func;
+      }
+      if (argCount === 1) {
+        return function(value) {
+          return func.call(thisArg, value);
+        };
+      }
+      if (argCount === 2) {
+        return function(a, b) {
+          return func.call(thisArg, a, b);
+        };
+      }
+      if (argCount === 4) {
+        return function(accumulator, value, index, collection) {
+          return func.call(thisArg, accumulator, value, index, collection);
+        };
+      }
+      return function(value, index, collection) {
+        return func.call(thisArg, value, index, collection);
+      };
+    }
+
+    /**
+     * Creates a function that will delay the execution of `func` until after
+     * `wait` milliseconds have elapsed since the last time it was invoked. Pass
+     * an `options` object to indicate that `func` should be invoked on the leading
+     * and/or trailing edge of the `wait` timeout. Subsequent calls to the debounced
+     * function will return the result of the last `func` call.
+     *
+     * Note: If `leading` and `trailing` options are `true`, `func` will be called
+     * on the trailing edge of the timeout only if the the debounced function is
+     * invoked more than once during the `wait` timeout.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Function} func The function to debounce.
+     * @param {Number} wait The number of milliseconds to delay.
+     * @param {Object} options The options object.
+     *  [leading=false] A boolean to specify execution on the leading edge of the timeout.
+     *  [maxWait] The maximum time `func` is allowed to be delayed before it's called.
+     *  [trailing=true] A boolean to specify execution on the trailing edge of the timeout.
+     * @returns {Function} Returns the new debounced function.
+     * @example
+     *
+     * var lazyLayout = _.debounce(calculateLayout, 300);
+     * jQuery(window).on('resize', lazyLayout);
+     *
+     * jQuery('#postbox').on('click', _.debounce(sendMail, 200, {
+     *   'leading': true,
+     *   'trailing': false
+     * });
+     */
+    function debounce(func, wait, options) {
+      var args,
+          result,
+          thisArg,
+          callCount = 0,
+          lastCalled = 0,
+          maxWait = false,
+          maxTimeoutId = null,
+          timeoutId = null,
+          trailing = true;
+
+      function clear() {
+        clearTimeout(maxTimeoutId);
+        clearTimeout(timeoutId);
+        callCount = 0;
+        maxTimeoutId = timeoutId = null;
+      }
+
+      function delayed() {
+        var isCalled = trailing && (!leading || callCount > 1);
+        clear();
+        if (isCalled) {
+          if (maxWait !== false) {
+            lastCalled = new Date;
+          }
+          result = func.apply(thisArg, args);
+        }
+      }
+
+      function maxDelayed() {
+        clear();
+        if (trailing || (maxWait !== wait)) {
+          lastCalled = new Date;
+          result = func.apply(thisArg, args);
+        }
+      }
+
+      wait = nativeMax(0, wait || 0);
+      if (options === true) {
+        var leading = true;
+        trailing = false;
+      } else if (isObject(options)) {
+        leading = options.leading;
+        maxWait = 'maxWait' in options && nativeMax(wait, options.maxWait || 0);
+        trailing = 'trailing' in options ? options.trailing : trailing;
+      }
+      return function() {
+        args = arguments;
+        thisArg = this;
+        callCount++;
+
+        // avoid issues with Titanium and `undefined` timeout ids
+        // https://github.com/appcelerator/titanium_mobile/blob/3_1_0_GA/android/titanium/src/java/ti/modules/titanium/TitaniumModule.java#L185-L192
+        clearTimeout(timeoutId);
+
+        if (maxWait === false) {
+          if (leading && callCount < 2) {
+            result = func.apply(thisArg, args);
+          }
+        } else {
+          var now = new Date;
+          if (!maxTimeoutId && !leading) {
+            lastCalled = now;
+          }
+          var remaining = maxWait - (now - lastCalled);
+          if (remaining <= 0) {
+            clearTimeout(maxTimeoutId);
+            maxTimeoutId = null;
+            lastCalled = now;
+            result = func.apply(thisArg, args);
+          }
+          else if (!maxTimeoutId) {
+            maxTimeoutId = setTimeout(maxDelayed, remaining);
+          }
+        }
+        if (wait !== maxWait) {
+          timeoutId = setTimeout(delayed, wait);
+        }
+        return result;
+      };
+    }
+
+    /**
+     * Defers executing the `func` function until the current call stack has cleared.
+     * Additional arguments will be passed to `func` when it is invoked.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Function} func The function to defer.
+     * @param {Mixed} [arg1, arg2, ...] Arguments to invoke the function with.
+     * @returns {Number} Returns the timer id.
+     * @example
+     *
+     * _.defer(function() { alert('deferred'); });
+     * // returns from the function before `alert` is called
+     */
+    function defer(func) {
+      var args = nativeSlice.call(arguments, 1);
+      return setTimeout(function() { func.apply(undefined, args); }, 1);
+    }
+    // use `setImmediate` if it's available in Node.js
+    if (isV8 && freeModule && typeof setImmediate == 'function') {
+      defer = bind(setImmediate, context);
+    }
+
+    /**
+     * Executes the `func` function after `wait` milliseconds. Additional arguments
+     * will be passed to `func` when it is invoked.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Function} func The function to delay.
+     * @param {Number} wait The number of milliseconds to delay execution.
+     * @param {Mixed} [arg1, arg2, ...] Arguments to invoke the function with.
+     * @returns {Number} Returns the timer id.
+     * @example
+     *
+     * var log = _.bind(console.log, console);
+     * _.delay(log, 1000, 'logged later');
+     * // => 'logged later' (Appears after one second.)
+     */
+    function delay(func, wait) {
+      var args = nativeSlice.call(arguments, 2);
+      return setTimeout(function() { func.apply(undefined, args); }, wait);
+    }
+
+    /**
+     * Creates a function that memoizes the result of `func`. If `resolver` is
+     * passed, it will be used to determine the cache key for storing the result
+     * based on the arguments passed to the memoized function. By default, the first
+     * argument passed to the memoized function is used as the cache key. The `func`
+     * is executed with the `this` binding of the memoized function. The result
+     * cache is exposed as the `cache` property on the memoized function.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Function} func The function to have its output memoized.
+     * @param {Function} [resolver] A function used to resolve the cache key.
+     * @returns {Function} Returns the new memoizing function.
+     * @example
+     *
+     * var fibonacci = _.memoize(function(n) {
+     *   return n < 2 ? n : fibonacci(n - 1) + fibonacci(n - 2);
+     * });
+     */
+    function memoize(func, resolver) {
+      function memoized() {
+        var cache = memoized.cache,
+            key = keyPrefix + (resolver ? resolver.apply(this, arguments) : arguments[0]);
+
+        return hasOwnProperty.call(cache, key)
+          ? cache[key]
+          : (cache[key] = func.apply(this, arguments));
+      }
+      memoized.cache = {};
+      return memoized;
+    }
+
+    /**
+     * Creates a function that is restricted to execute `func` once. Repeat calls to
+     * the function will return the value of the first call. The `func` is executed
+     * with the `this` binding of the created function.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Function} func The function to restrict.
+     * @returns {Function} Returns the new restricted function.
+     * @example
+     *
+     * var initialize = _.once(createApplication);
+     * initialize();
+     * initialize();
+     * // `initialize` executes `createApplication` once
+     */
+    function once(func) {
+      var ran,
+          result;
+
+      return function() {
+        if (ran) {
+          return result;
+        }
+        ran = true;
+        result = func.apply(this, arguments);
+
+        // clear the `func` variable so the function may be garbage collected
+        func = null;
+        return result;
+      };
+    }
+
+    /**
+     * Creates a function that, when called, invokes `func` with any additional
+     * `partial` arguments prepended to those passed to the new function. This
+     * method is similar to `_.bind`, except it does **not** alter the `this` binding.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Function} func The function to partially apply arguments to.
+     * @param {Mixed} [arg1, arg2, ...] Arguments to be partially applied.
+     * @returns {Function} Returns the new partially applied function.
+     * @example
+     *
+     * var greet = function(greeting, name) { return greeting + ' ' + name; };
+     * var hi = _.partial(greet, 'hi');
+     * hi('moe');
+     * // => 'hi moe'
+     */
+    function partial(func) {
+      return createBound(func, nativeSlice.call(arguments, 1));
+    }
+
+    /**
+     * This method is similar to `_.partial`, except that `partial` arguments are
+     * appended to those passed to the new function.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Function} func The function to partially apply arguments to.
+     * @param {Mixed} [arg1, arg2, ...] Arguments to be partially applied.
+     * @returns {Function} Returns the new partially applied function.
+     * @example
+     *
+     * var defaultsDeep = _.partialRight(_.merge, _.defaults);
+     *
+     * var options = {
+     *   'variable': 'data',
+     *   'imports': { 'jq': $ }
+     * };
+     *
+     * defaultsDeep(options, _.templateSettings);
+     *
+     * options.variable
+     * // => 'data'
+     *
+     * options.imports
+     * // => { '_': _, 'jq': $ }
+     */
+    function partialRight(func) {
+      return createBound(func, nativeSlice.call(arguments, 1), null, indicatorObject);
+    }
+
+    /**
+     * Creates a function that, when executed, will only call the `func` function
+     * at most once per every `wait` milliseconds. Pass an `options` object to
+     * indicate that `func` should be invoked on the leading and/or trailing edge
+     * of the `wait` timeout. Subsequent calls to the throttled function will
+     * return the result of the last `func` call.
+     *
+     * Note: If `leading` and `trailing` options are `true`, `func` will be called
+     * on the trailing edge of the timeout only if the the throttled function is
+     * invoked more than once during the `wait` timeout.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Function} func The function to throttle.
+     * @param {Number} wait The number of milliseconds to throttle executions to.
+     * @param {Object} options The options object.
+     *  [leading=true] A boolean to specify execution on the leading edge of the timeout.
+     *  [trailing=true] A boolean to specify execution on the trailing edge of the timeout.
+     * @returns {Function} Returns the new throttled function.
+     * @example
+     *
+     * var throttled = _.throttle(updatePosition, 100);
+     * jQuery(window).on('scroll', throttled);
+     *
+     * jQuery('.interactive').on('click', _.throttle(renewToken, 300000, {
+     *   'trailing': false
+     * }));
+     */
+    function throttle(func, wait, options) {
+      var leading = true,
+          trailing = true;
+
+      if (options === false) {
+        leading = false;
+      } else if (isObject(options)) {
+        leading = 'leading' in options ? options.leading : leading;
+        trailing = 'trailing' in options ? options.trailing : trailing;
+      }
+      options = getObject();
+      options.leading = leading;
+      options.maxWait = wait;
+      options.trailing = trailing;
+
+      var result = debounce(func, wait, options);
+      releaseObject(options);
+      return result;
+    }
+
+    /**
+     * Creates a function that passes `value` to the `wrapper` function as its
+     * first argument. Additional arguments passed to the function are appended
+     * to those passed to the `wrapper` function. The `wrapper` is executed with
+     * the `this` binding of the created function.
+     *
+     * @static
+     * @memberOf _
+     * @category Functions
+     * @param {Mixed} value The value to wrap.
+     * @param {Function} wrapper The wrapper function.
+     * @returns {Function} Returns the new function.
+     * @example
+     *
+     * var hello = function(name) { return 'hello ' + name; };
+     * hello = _.wrap(hello, function(func) {
+     *   return 'before, ' + func('moe') + ', after';
+     * });
+     * hello();
+     * // => 'before, hello moe, after'
+     */
+    function wrap(value, wrapper) {
+      return function() {
+        var args = [value];
+        push.apply(args, arguments);
+        return wrapper.apply(this, args);
+      };
+    }
+
+    /*--------------------------------------------------------------------------*/
+
+    /**
+     * Converts the characters `&`, `<`, `>`, `"`, and `'` in `string` to their
+     * corresponding HTML entities.
+     *
+     * @static
+     * @memberOf _
+     * @category Utilities
+     * @param {String} string The string to escape.
+     * @returns {String} Returns the escaped string.
+     * @example
+     *
+     * _.escape('Moe, Larry & Curly');
+     * // => 'Moe, Larry &amp; Curly'
+     */
+    function escape(string) {
+      return string == null ? '' : String(string).replace(reUnescapedHtml, escapeHtmlChar);
+    }
+
+    /**
+     * This method returns the first argument passed to it.
+     *
+     * @static
+     * @memberOf _
+     * @category Utilities
+     * @param {Mixed} value Any value.
+     * @returns {Mixed} Returns `value`.
+     * @example
+     *
+     * var moe = { 'name': 'moe' };
+     * moe === _.identity(moe);
+     * // => true
+     */
+    function identity(value) {
+      return value;
+    }
+
+    /**
+     * Adds functions properties of `object` to the `lodash` function and chainable
+     * wrapper.
+     *
+     * @static
+     * @memberOf _
+     * @category Utilities
+     * @param {Object} object The object of function properties to add to `lodash`.
+     * @example
+     *
+     * _.mixin({
+     *   'capitalize': function(string) {
+     *     return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
+     *   }
+     * });
+     *
+     * _.capitalize('moe');
+     * // => 'Moe'
+     *
+     * _('moe').capitalize();
+     * // => 'Moe'
+     */
+    function mixin(object) {
+      forEach(functions(object), function(methodName) {
+        var func = lodash[methodName] = object[methodName];
+
+        lodash.prototype[methodName] = function() {
+          var value = this.__wrapped__,
+              args = [value];
+
+          push.apply(args, arguments);
+          var result = func.apply(lodash, args);
+          return (value && typeof value == 'object' && value === result)
+            ? this
+            : new lodashWrapper(result);
+        };
+      });
+    }
+
+    /**
+     * Reverts the '_' variable to its previous value and returns a reference to
+     * the `lodash` function.
+     *
+     * @static
+     * @memberOf _
+     * @category Utilities
+     * @returns {Function} Returns the `lodash` function.
+     * @example
+     *
+     * var lodash = _.noConflict();
+     */
+    function noConflict() {
+      context._ = oldDash;
+      return this;
+    }
+
+    /**
+     * Converts the given `value` into an integer of the specified `radix`.
+     * If `radix` is `undefined` or `0`, a `radix` of `10` is used unless the
+     * `value` is a hexadecimal, in which case a `radix` of `16` is used.
+     *
+     * Note: This method avoids differences in native ES3 and ES5 `parseInt`
+     * implementations. See http://es5.github.com/#E.
+     *
+     * @static
+     * @memberOf _
+     * @category Utilities
+     * @param {String} value The value to parse.
+     * @param {Number} [radix] The radix used to interpret the value to parse.
+     * @returns {Number} Returns the new integer value.
+     * @example
+     *
+     * _.parseInt('08');
+     * // => 8
+     */
+    var parseInt = nativeParseInt(whitespace + '08') == 8 ? nativeParseInt : function(value, radix) {
+      // Firefox and Opera still follow the ES3 specified implementation of `parseInt`
+      return nativeParseInt(isString(value) ? value.replace(reLeadingSpacesAndZeros, '') : value, radix || 0);
+    };
+
+    /**
+     * Produces a random number between `min` and `max` (inclusive). If only one
+     * argument is passed, a number between `0` and the given number will be returned.
+     *
+     * @static
+     * @memberOf _
+     * @category Utilities
+     * @param {Number} [min=0] The minimum possible value.
+     * @param {Number} [max=1] The maximum possible value.
+     * @returns {Number} Returns a random number.
+     * @example
+     *
+     * _.random(0, 5);
+     * // => a number between 0 and 5
+     *
+     * _.random(5);
+     * // => also a number between 0 and 5
+     */
+    function random(min, max) {
+      if (min == null && max == null) {
+        max = 1;
+      }
+      min = +min || 0;
+      if (max == null) {
+        max = min;
+        min = 0;
+      } else {
+        max = +max || 0;
+      }
+      var rand = nativeRandom();
+      return (min % 1 || max % 1)
+        ? min + nativeMin(rand * (max - min + parseFloat('1e-' + ((rand +'').length - 1))), max)
+        : min + floor(rand * (max - min + 1));
+    }
+
+    /**
+     * Resolves the value of `property` on `object`. If `property` is a function,
+     * it will be invoked with the `this` binding of `object` and its result returned,
+     * else the property value is returned. If `object` is falsey, then `undefined`
+     * is returned.
+     *
+     * @static
+     * @memberOf _
+     * @category Utilities
+     * @param {Object} object The object to inspect.
+     * @param {String} property The property to get the value of.
+     * @returns {Mixed} Returns the resolved value.
+     * @example
+     *
+     * var object = {
+     *   'cheese': 'crumpets',
+     *   'stuff': function() {
+     *     return 'nonsense';
+     *   }
+     * };
+     *
+     * _.result(object, 'cheese');
+     * // => 'crumpets'
+     *
+     * _.result(object, 'stuff');
+     * // => 'nonsense'
+     */
+    function result(object, property) {
+      var value = object ? object[property] : undefined;
+      return isFunction(value) ? object[property]() : value;
+    }
+
+    /**
+     * A micro-templating method that handles arbitrary delimiters, preserves
+     * whitespace, and correctly escapes quotes within interpolated code.
+     *
+     * Note: In the development build, `_.template` utilizes sourceURLs for easier
+     * debugging. See http://www.html5rocks.com/en/tutorials/developertools/sourcemaps/#toc-sourceurl
+     *
+     * For more information on precompiling templates see:
+     * http://lodash.com/#custom-builds
+     *
+     * For more information on Chrome extension sandboxes see:
+     * http://developer.chrome.com/stable/extensions/sandboxingEval.html
+     *
+     * @static
+     * @memberOf _
+     * @category Utilities
+     * @param {String} text The template text.
+     * @param {Object} data The data object used to populate the text.
+     * @param {Object} options The options object.
+     *  escape - The "escape" delimiter regexp.
+     *  evaluate - The "evaluate" delimiter regexp.
+     *  interpolate - The "interpolate" delimiter regexp.
+     *  sourceURL - The sourceURL of the template's compiled source.
+     *  variable - The data object variable name.
+     * @returns {Function|String} Returns a compiled function when no `data` object
+     *  is given, else it returns the interpolated text.
+     * @example
+     *
+     * // using a compiled template
+     * var compiled = _.template('hello <%= name %>');
+     * compiled({ 'name': 'moe' });
+     * // => 'hello moe'
+     *
+     * var list = '<% _.forEach(people, function(name) { %><li><%= name %></li><% }); %>';
+     * _.template(list, { 'people': ['moe', 'larry'] });
+     * // => '<li>moe</li><li>larry</li>'
+     *
+     * // using the "escape" delimiter to escape HTML in data property values
+     * _.template('<b><%- value %></b>', { 'value': '<script>' });
+     * // => '<b>&lt;script&gt;</b>'
+     *
+     * // using the ES6 delimiter as an alternative to the default "interpolate" delimiter
+     * _.template('hello ${ name }', { 'name': 'curly' });
+     * // => 'hello curly'
+     *
+     * // using the internal `print` function in "evaluate" delimiters
+     * _.template('<% print("hello " + epithet); %>!', { 'epithet': 'stooge' });
+     * // => 'hello stooge!'
+     *
+     * // using custom template delimiters
+     * _.templateSettings = {
+     *   'interpolate': /{{([\s\S]+?)}}/g
+     * };
+     *
+     * _.template('hello {{ name }}!', { 'name': 'mustache' });
+     * // => 'hello mustache!'
+     *
+     * // using the `sourceURL` option to specify a custom sourceURL for the template
+     * var compiled = _.template('hello <%= name %>', null, { 'sourceURL': '/basic/greeting.jst' });
+     * compiled(data);
+     * // => find the source of "greeting.jst" under the Sources tab or Resources panel of the web inspector
+     *
+     * // using the `variable` option to ensure a with-statement isn't used in the compiled template
+     * var compiled = _.template('hi <%= data.name %>!', null, { 'variable': 'data' });
+     * compiled.source;
+     * // => function(data) {
+     *   var __t, __p = '', __e = _.escape;
+     *   __p += 'hi ' + ((__t = ( data.name )) == null ? '' : __t) + '!';
+     *   return __p;
+     * }
+     *
+     * // using the `source` property to inline compiled templates for meaningful
+     * // line numbers in error messages and a stack trace
+     * fs.writeFileSync(path.join(cwd, 'jst.js'), '\
+     *   var JST = {\
+     *     "main": ' + _.template(mainText).source + '\
+     *   };\
+     * ');
+     */
+    function template(text, data, options) {
+      // based on John Resig's `tmpl` implementation
+      // http://ejohn.org/blog/javascript-micro-templating/
+      // and Laura Doktorova's doT.js
+      // https://github.com/olado/doT
+      var settings = lodash.templateSettings;
+      text || (text = '');
+
+      // avoid missing dependencies when `iteratorTemplate` is not defined
+      options = defaults({}, options, settings);
+
+      var imports = defaults({}, options.imports, settings.imports),
+          importsKeys = keys(imports),
+          importsValues = values(imports);
+
+      var isEvaluating,
+          index = 0,
+          interpolate = options.interpolate || reNoMatch,
+          source = "__p += '";
+
+      // compile the regexp to match each delimiter
+      var reDelimiters = RegExp(
+        (options.escape || reNoMatch).source + '|' +
+        interpolate.source + '|' +
+        (interpolate === reInterpolate ? reEsTemplate : reNoMatch).source + '|' +
+        (options.evaluate || reNoMatch).source + '|$'
+      , 'g');
+
+      text.replace(reDelimiters, function(match, escapeValue, interpolateValue, esTemplateValue, evaluateValue, offset) {
+        interpolateValue || (interpolateValue = esTemplateValue);
+
+        // escape characters that cannot be included in string literals
+        source += text.slice(index, offset).replace(reUnescapedString, escapeStringChar);
+
+        // replace delimiters with snippets
+        if (escapeValue) {
+          source += "' +\n__e(" + escapeValue + ") +\n'";
+        }
+        if (evaluateValue) {
+          isEvaluating = true;
+          source += "';\n" + evaluateValue + ";\n__p += '";
+        }
+        if (interpolateValue) {
+          source += "' +\n((__t = (" + interpolateValue + ")) == null ? '' : __t) +\n'";
+        }
+        index = offset + match.length;
+
+        // the JS engine embedded in Adobe products requires returning the `match`
+        // string in order to produce the correct `offset` value
+        return match;
+      });
+
+      source += "';\n";
+
+      // if `variable` is not specified, wrap a with-statement around the generated
+      // code to add the data object to the top of the scope chain
+      var variable = options.variable,
+          hasVariable = variable;
+
+      if (!hasVariable) {
+        variable = 'obj';
+        source = 'with (' + variable + ') {\n' + source + '\n}\n';
+      }
+      // cleanup code by stripping empty strings
+      source = (isEvaluating ? source.replace(reEmptyStringLeading, '') : source)
+        .replace(reEmptyStringMiddle, '$1')
+        .replace(reEmptyStringTrailing, '$1;');
+
+      // frame code as the function body
+      source = 'function(' + variable + ') {\n' +
+        (hasVariable ? '' : variable + ' || (' + variable + ' = {});\n') +
+        "var __t, __p = '', __e = _.escape" +
+        (isEvaluating
+          ? ', __j = Array.prototype.join;\n' +
+            "function print() { __p += __j.call(arguments, '') }\n"
+          : ';\n'
+        ) +
+        source +
+        'return __p\n}';
+
+      // Use a sourceURL for easier debugging and wrap in a multi-line comment to
+      // avoid issues with Narwhal, IE conditional compilation, and the JS engine
+      // embedded in Adobe products.
+      // http://www.html5rocks.com/en/tutorials/developertools/sourcemaps/#toc-sourceurl
+      var sourceURL = '\n/*\n//@ sourceURL=' + (options.sourceURL || '/lodash/template/source[' + (templateCounter++) + ']') + '\n*/';
+
+      try {
+        var result = Function(importsKeys, 'return ' + source + sourceURL).apply(undefined, importsValues);
+      } catch(e) {
+        e.source = source;
+        throw e;
+      }
+      if (data) {
+        return result(data);
+      }
+      // provide the compiled function's source via its `toString` method, in
+      // supported environments, or the `source` property as a convenience for
+      // inlining compiled templates during the build process
+      result.source = source;
+      return result;
+    }
+
+    /**
+     * Executes the `callback` function `n` times, returning an array of the results
+     * of each `callback` execution. The `callback` is bound to `thisArg` and invoked
+     * with one argument; (index).
+     *
+     * @static
+     * @memberOf _
+     * @category Utilities
+     * @param {Number} n The number of times to execute the callback.
+     * @param {Function} callback The function called per iteration.
+     * @param {Mixed} [thisArg] The `this` binding of `callback`.
+     * @returns {Array} Returns a new array of the results of each `callback` execution.
+     * @example
+     *
+     * var diceRolls = _.times(3, _.partial(_.random, 1, 6));
+     * // => [3, 6, 4]
+     *
+     * _.times(3, function(n) { mage.castSpell(n); });
+     * // => calls `mage.castSpell(n)` three times, passing `n` of `0`, `1`, and `2` respectively
+     *
+     * _.times(3, function(n) { this.cast(n); }, mage);
+     * // => also calls `mage.castSpell(n)` three times
+     */
+    function times(n, callback, thisArg) {
+      n = (n = +n) > -1 ? n : 0;
+      var index = -1,
+          result = Array(n);
+
+      callback = lodash.createCallback(callback, thisArg, 1);
+      while (++index < n) {
+        result[index] = callback(index);
+      }
+      return result;
+    }
+
+    /**
+     * The inverse of `_.escape`, this method converts the HTML entities
+     * `&amp;`, `&lt;`, `&gt;`, `&quot;`, and `&#39;` in `string` to their
+     * corresponding characters.
+     *
+     * @static
+     * @memberOf _
+     * @category Utilities
+     * @param {String} string The string to unescape.
+     * @returns {String} Returns the unescaped string.
+     * @example
+     *
+     * _.unescape('Moe, Larry &amp; Curly');
+     * // => 'Moe, Larry & Curly'
+     */
+    function unescape(string) {
+      return string == null ? '' : String(string).replace(reEscapedHtml, unescapeHtmlChar);
+    }
+
+    /**
+     * Generates a unique ID. If `prefix` is passed, the ID will be appended to it.
+     *
+     * @static
+     * @memberOf _
+     * @category Utilities
+     * @param {String} [prefix] The value to prefix the ID with.
+     * @returns {String} Returns the unique ID.
+     * @example
+     *
+     * _.uniqueId('contact_');
+     * // => 'contact_104'
+     *
+     * _.uniqueId();
+     * // => '105'
+     */
+    function uniqueId(prefix) {
+      var id = ++idCounter;
+      return String(prefix == null ? '' : prefix) + id;
+    }
+
+    /*--------------------------------------------------------------------------*/
+
+    /**
+     * Invokes `interceptor` with the `value` as the first argument, and then
+     * returns `value`. The purpose of this method is to "tap into" a method chain,
+     * in order to perform operations on intermediate results within the chain.
+     *
+     * @static
+     * @memberOf _
+     * @category Chaining
+     * @param {Mixed} value The value to pass to `interceptor`.
+     * @param {Function} interceptor The function to invoke.
+     * @returns {Mixed} Returns `value`.
+     * @example
+     *
+     * _([1, 2, 3, 4])
+     *  .filter(function(num) { return num % 2 == 0; })
+     *  .tap(alert)
+     *  .map(function(num) { return num * num; })
+     *  .value();
+     * // => // [2, 4] (alerted)
+     * // => [4, 16]
+     */
+    function tap(value, interceptor) {
+      interceptor(value);
+      return value;
+    }
+
+    /**
+     * Produces the `toString` result of the wrapped value.
+     *
+     * @name toString
+     * @memberOf _
+     * @category Chaining
+     * @returns {String} Returns the string result.
+     * @example
+     *
+     * _([1, 2, 3]).toString();
+     * // => '1,2,3'
+     */
+    function wrapperToString() {
+      return String(this.__wrapped__);
+    }
+
+    /**
+     * Extracts the wrapped value.
+     *
+     * @name valueOf
+     * @memberOf _
+     * @alias value
+     * @category Chaining
+     * @returns {Mixed} Returns the wrapped value.
+     * @example
+     *
+     * _([1, 2, 3]).valueOf();
+     * // => [1, 2, 3]
+     */
+    function wrapperValueOf() {
+      return this.__wrapped__;
+    }
+
+    /*--------------------------------------------------------------------------*/
+
+    // add functions that return wrapped values when chaining
+    lodash.after = after;
+    lodash.assign = assign;
+    lodash.at = at;
+    lodash.bind = bind;
+    lodash.bindAll = bindAll;
+    lodash.bindKey = bindKey;
+    lodash.compact = compact;
+    lodash.compose = compose;
+    lodash.countBy = countBy;
+    lodash.createCallback = createCallback;
+    lodash.debounce = debounce;
+    lodash.defaults = defaults;
+    lodash.defer = defer;
+    lodash.delay = delay;
+    lodash.difference = difference;
+    lodash.filter = filter;
+    lodash.flatten = flatten;
+    lodash.forEach = forEach;
+    lodash.forIn = forIn;
+    lodash.forOwn = forOwn;
+    lodash.functions = functions;
+    lodash.groupBy = groupBy;
+    lodash.initial = initial;
+    lodash.intersection = intersection;
+    lodash.invert = invert;
+    lodash.invoke = invoke;
+    lodash.keys = keys;
+    lodash.map = map;
+    lodash.max = max;
+    lodash.memoize = memoize;
+    lodash.merge = merge;
+    lodash.min = min;
+    lodash.omit = omit;
+    lodash.once = once;
+    lodash.pairs = pairs;
+    lodash.partial = partial;
+    lodash.partialRight = partialRight;
+    lodash.pick = pick;
+    lodash.pluck = pluck;
+    lodash.range = range;
+    lodash.reject = reject;
+    lodash.rest = rest;
+    lodash.shuffle = shuffle;
+    lodash.sortBy = sortBy;
+    lodash.tap = tap;
+    lodash.throttle = throttle;
+    lodash.times = times;
+    lodash.toArray = toArray;
+    lodash.transform = transform;
+    lodash.union = union;
+    lodash.uniq = uniq;
+    lodash.unzip = unzip;
+    lodash.values = values;
+    lodash.where = where;
+    lodash.without = without;
+    lodash.wrap = wrap;
+    lodash.zip = zip;
+    lodash.zipObject = zipObject;
+
+    // add aliases
+    lodash.collect = map;
+    lodash.drop = rest;
+    lodash.each = forEach;
+    lodash.extend = assign;
+    lodash.methods = functions;
+    lodash.object = zipObject;
+    lodash.select = filter;
+    lodash.tail = rest;
+    lodash.unique = uniq;
+
+    // add functions to `lodash.prototype`
+    mixin(lodash);
+
+    // add Underscore compat
+    lodash.chain = lodash;
+    lodash.prototype.chain = function() { return this; };
+
+    /*--------------------------------------------------------------------------*/
+
+    // add functions that return unwrapped values when chaining
+    lodash.clone = clone;
+    lodash.cloneDeep = cloneDeep;
+    lodash.contains = contains;
+    lodash.escape = escape;
+    lodash.every = every;
+    lodash.find = find;
+    lodash.findIndex = findIndex;
+    lodash.findKey = findKey;
+    lodash.has = has;
+    lodash.identity = identity;
+    lodash.indexOf = indexOf;
+    lodash.isArguments = isArguments;
+    lodash.isArray = isArray;
+    lodash.isBoolean = isBoolean;
+    lodash.isDate = isDate;
+    lodash.isElement = isElement;
+    lodash.isEmpty = isEmpty;
+    lodash.isEqual = isEqual;
+    lodash.isFinite = isFinite;
+    lodash.isFunction = isFunction;
+    lodash.isNaN = isNaN;
+    lodash.isNull = isNull;
+    lodash.isNumber = isNumber;
+    lodash.isObject = isObject;
+    lodash.isPlainObject = isPlainObject;
+    lodash.isRegExp = isRegExp;
+    lodash.isString = isString;
+    lodash.isUndefined = isUndefined;
+    lodash.lastIndexOf = lastIndexOf;
+    lodash.mixin = mixin;
+    lodash.noConflict = noConflict;
+    lodash.parseInt = parseInt;
+    lodash.random = random;
+    lodash.reduce = reduce;
+    lodash.reduceRight = reduceRight;
+    lodash.result = result;
+    lodash.runInContext = runInContext;
+    lodash.size = size;
+    lodash.some = some;
+    lodash.sortedIndex = sortedIndex;
+    lodash.template = template;
+    lodash.unescape = unescape;
+    lodash.uniqueId = uniqueId;
+
+    // add aliases
+    lodash.all = every;
+    lodash.any = some;
+    lodash.detect = find;
+    lodash.findWhere = find;
+    lodash.foldl = reduce;
+    lodash.foldr = reduceRight;
+    lodash.include = contains;
+    lodash.inject = reduce;
+
+    forOwn(lodash, function(func, methodName) {
+      if (!lodash.prototype[methodName]) {
+        lodash.prototype[methodName] = function() {
+          var args = [this.__wrapped__];
+          push.apply(args, arguments);
+          return func.apply(lodash, args);
+        };
+      }
+    });
+
+    /*--------------------------------------------------------------------------*/
+
+    // add functions capable of returning wrapped and unwrapped values when chaining
+    lodash.first = first;
+    lodash.last = last;
+
+    // add aliases
+    lodash.take = first;
+    lodash.head = first;
+
+    forOwn(lodash, function(func, methodName) {
+      if (!lodash.prototype[methodName]) {
+        lodash.prototype[methodName]= function(callback, thisArg) {
+          var result = func(this.__wrapped__, callback, thisArg);
+          return callback == null || (thisArg && typeof callback != 'function')
+            ? result
+            : new lodashWrapper(result);
+        };
+      }
+    });
+
+    /*--------------------------------------------------------------------------*/
+
+    /**
+     * The semantic version number.
+     *
+     * @static
+     * @memberOf _
+     * @type String
+     */
+    lodash.VERSION = '1.3.1';
+
+    // add "Chaining" functions to the wrapper
+    lodash.prototype.toString = wrapperToString;
+    lodash.prototype.value = wrapperValueOf;
+    lodash.prototype.valueOf = wrapperValueOf;
+
+    // add `Array` functions that return unwrapped values
+    forEach(['join', 'pop', 'shift'], function(methodName) {
+      var func = arrayRef[methodName];
+      lodash.prototype[methodName] = function() {
+        return func.apply(this.__wrapped__, arguments);
+      };
+    });
+
+    // add `Array` functions that return the wrapped value
+    forEach(['push', 'reverse', 'sort', 'unshift'], function(methodName) {
+      var func = arrayRef[methodName];
+      lodash.prototype[methodName] = function() {
+        func.apply(this.__wrapped__, arguments);
+        return this;
+      };
+    });
+
+    // add `Array` functions that return new wrapped values
+    forEach(['concat', 'slice', 'splice'], function(methodName) {
+      var func = arrayRef[methodName];
+      lodash.prototype[methodName] = function() {
+        return new lodashWrapper(func.apply(this.__wrapped__, arguments));
+      };
+    });
+
+    return lodash;
+  }
+
+  /*--------------------------------------------------------------------------*/
+
+  // expose Lo-Dash
+  var _ = runInContext();
+
+  // some AMD build optimizers, like r.js, check for specific condition patterns like the following:
+  if (true) {
+    // Expose Lo-Dash to the global object even when an AMD loader is present in
+    // case Lo-Dash was injected by a third-party script and not intended to be
+    // loaded as a module. The global assignment can be reverted in the Lo-Dash
+    // module via its `noConflict()` method.
+    window._ = _;
+
+    // define as an anonymous module so, through path mapping, it can be
+    // referenced as the "underscore" module
+    !(__WEBPACK_AMD_DEFINE_RESULT__ = (function() {
+      return _;
+    }).call(exports, __webpack_require__, exports, module),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+  }
+  // check for `exports` after `define` in case a build optimizer adds an `exports` object
+  else {}
+}(this));
+
+/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../../../../webpack/buildin/module.js */ "./node_modules/webpack/buildin/module.js")(module), __webpack_require__(/*! ./../../../../webpack/buildin/global.js */ "./node_modules/webpack/buildin/global.js")))
+
+/***/ }),
+
+/***/ "./node_modules/prettify/prettify.js":
+/*!*******************************************!*\
+  !*** ./node_modules/prettify/prettify.js ***!
+  \*******************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/**
+ * {{prettify}} by Jon Schlinkert
+ * http://github.com/helpers/prettify
+ *
+ * Copyright (c) 2013 Jon Schlinkert
+ * MIT License
+ */
+
+
+
+var _ = __webpack_require__(/*! lodash */ "./node_modules/prettify/node_modules/lodash/dist/lodash.js");
+var engineOpts = __webpack_require__(/*! ./lib/defaults */ "./node_modules/prettify/lib/defaults.js");
+
+function condense(str) {
+  return str.replace(/(\n|\r){2,}/g, '\n');
+}
+
+function padcomments(str) {
+  return str.replace(/(\s*<!--)/g, '\n$1');
+}
+
+function fixspaces(str) {
+  return str.replace(/(<\/(a|span|strong|h1|h2|h3|h4|h5|h6)>(?!(,|\.|!|\?|;|:)))/g, '$1 ');
+}
+
+module.exports.register = function (Handlebars, options) {
+
+  // If the 'assemble.options' object exists, use it. Otherwise use an empty object.
+  var o = options || {};
+
+
+  /**
+   * Prettify
+   * @param  {[type]} options [description]
+   * @return {[type]}         [description]
+   */
+  Handlebars.registerHelper('prettify', function (options) {
+    var opts = {};
+    var content = options.fn(this);
+
+    // Prettify using js, CSS or HTML mode. 'html' is the default.
+    function prettifyBasedOnMode() {
+      opts.mode = 'html';
+      o.prettify = (opts.mode === 'html') ? o.prettify : o.prettify[opts.mode];
+      opts = _.defaults(options.hash, _.extend({}, opts, engineOpts[opts.mode], o.prettify));
+      opts.indent_size = opts.indent;
+      content = __webpack_require__(/*! js-prettify */ "./node_modules/js-prettify/js/index.js")[opts.mode](content, opts);
+    }
+
+    // Make it so.
+    prettifyBasedOnMode();
+
+    // Clean up new lines after prettification.
+    if(opts.mode === 'html') {
+      // Reduce multiple newlines to a single newline
+      content = (opts.condense === true) ? condense(content) : content;
+      // Add a single newline above code comments.
+      content = (opts.padcomments === true) ? padcomments(content) : content;
+    }
+
+    return new Handlebars.SafeString(fixspaces(content));
+  });
+};
+
+/***/ }),
+
 /***/ "./node_modules/style-loader/lib/addStyles.js":
 /*!****************************************************!*\
   !*** ./node_modules/style-loader/lib/addStyles.js ***!
@@ -11059,6 +19411,70 @@ module.exports = function (css) {
 
 /***/ }),
 
+/***/ "./node_modules/webpack/buildin/global.js":
+/*!***********************************!*\
+  !*** (webpack)/buildin/global.js ***!
+  \***********************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+var g;
+
+// This works in non-strict mode
+g = (function() {
+	return this;
+})();
+
+try {
+	// This works if eval is allowed (see CSP)
+	g = g || Function("return this")() || (1, eval)("this");
+} catch (e) {
+	// This works if the window reference is available
+	if (typeof window === "object") g = window;
+}
+
+// g can still be undefined, but nothing to do about it...
+// We return undefined, instead of nothing here, so it's
+// easier to handle this case. if(!global) { ...}
+
+module.exports = g;
+
+
+/***/ }),
+
+/***/ "./node_modules/webpack/buildin/module.js":
+/*!***********************************!*\
+  !*** (webpack)/buildin/module.js ***!
+  \***********************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = function(module) {
+	if (!module.webpackPolyfill) {
+		module.deprecate = function() {};
+		module.paths = [];
+		// module.parent = undefined by default
+		if (!module.children) module.children = [];
+		Object.defineProperty(module, "loaded", {
+			enumerable: true,
+			get: function() {
+				return module.l;
+			}
+		});
+		Object.defineProperty(module, "id", {
+			enumerable: true,
+			get: function() {
+				return module.i;
+			}
+		});
+		module.webpackPolyfill = 1;
+	}
+	return module;
+};
+
+
+/***/ }),
+
 /***/ "./src/js/index.js":
 /*!*************************!*\
   !*** ./src/js/index.js ***!
@@ -11071,6 +19487,7 @@ __webpack_require__.r(__webpack_exports__);
 /* WEBPACK VAR INJECTION */(function($) {/* harmony import */ var _style_index_scss__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../style/index.scss */ "./src/style/index.scss");
 /* harmony import */ var _style_index_scss__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_style_index_scss__WEBPACK_IMPORTED_MODULE_0__);
 
+var helpers = __webpack_require__(/*! prettify */ "./node_modules/prettify/prettify.js");
 
 /**
  *  EDIT ONLY INSIDE THIS RENDER FUNCTION
